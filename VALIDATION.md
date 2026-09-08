@@ -41,3 +41,15 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
 - Không đo sai số forced alignment thủ công trên từng từ. Mốc từ là kết quả STT, có thể cần sửa/duyệt với nguồn khó.
 - Crop và ảnh intro được dùng chung giữa preview/render; nhạc, voice off và chuyển đoạn cần duyệt trên MP4 cuối. AI phân loại chưa chắc chắn sẽ giữ toàn hình; không tự xóa audio hoặc suy diễn một chân dung không hiện diện trong source.
 - Chưa triển khai toàn bộ workflow SSML/NER/fact-check/danh bạ doanh nghiệp của tài liệu TTS tham khảo. Google có thể thay đổi ngữ điệu giữa các lần sinh audio.
+
+## Cập nhật v3 — 08/09/2026: photo intro, voice profile và theme
+
+- 102 test Python, 4 test JavaScript đạt; Vite và Docker production build đạt. Bổ sung kiểm tra profile, atempo thật, cache voice, alignment theo token gốc và retry mốc lỗi, crop an toàn, photo/highlight, tách cache clip và tắt caption không tắt audio.
+- Google tạo audio thật cho profile nữ/miền Nam/người đi làm/tin tức/trung tính/1,2x: 9,576083 giây. 45 token hiển thị căn vào audio; lượt đầu có mốc lỗi được từ chối, lượt tiếp thành công. Code thêm duration hint và một lần retry có kiểm tra, không chia đều timestamp. Chưa chấm accent vùng miền bằng hội đồng nghe.
+- Browser thật: profile/tiêu đề/ảnh được lưu qua reload, ba freeze frame tải được, AI gợi ý tiêu đề thành công; audio intro phát đủ 9,576 giây với karaoke đang đổi từ. Light/Dark dùng đúng logo MISA kèm tagline và accent #ff7300; đã xem ảnh chụp cả hai chế độ.
+- Kiểm tra PNG từ intro.mp4 tại giây 2: ảnh chân dung, tiêu đề ngắn với highlight cam, karaoke riêng; không còn thẻ tóm tắt hoặc khối lời dẫn tĩnh. Preview và export cùng photo renderer.
+- Trên 618 mốc focus của clip thực tế, tổng dịch chuyển ngang giữa mẫu cùng scene giảm 8,3889 → 0,5739 đơn vị chuẩn hóa (93,16%). Đây là diagnostic độ rung crop, không phải độ chính xác xác định người nói. Ảnh main.mp4 tại 8/20/94,75 giây giữ đủ mặt MC, khách mời trong cảnh toàn, và chân dung người nghe.
+- Job `8f4a43c6f4384f9ea35f62fce316e4aa` hoàn tất 100%, export `0edbf27cba1b42c99baad5512a7c3127`: 302,867 giây, 1080 × 1920, H.264 có audio, 129.956.642 byte. Intro ảnh + voice/karaoke, talk gốc 290,9 giây, outro, music ducking và watermark. Không có summary card. Bản sao ngoài Git: `../talkcut-v3-fullhd.mp4`.
+- Endpoint media trả HTTP 206, byte range 0–1023/129956642. Các source, clip và export cũ được giữ trong volume, SQLite có snapshot pre-v3-backup.sqlite.
+- Source scan trước publication không phát hiện key Google, token GitHub hoặc private key; `.env`, runtime DB và video/audio không tracked.
+- Giải mã toàn bộ MP4 cuối bằng FFmpeg `-v error -f null -` thành công, không báo lỗi.
