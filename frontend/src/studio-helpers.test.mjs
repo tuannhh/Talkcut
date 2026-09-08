@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {wordGroups,focusAt,focusGeometry} from './studio-helpers.mjs';
+test('sentence rows preserve word references and pause/speaker boundaries',()=>{const w=[{text:'Xin',start:0,end:.2,speaker:'a'},{text:'chào.',start:.3,end:.6,speaker:'a'},{text:'Câu',start:.7,end:.9,speaker:'a'},{text:'tiếp',start:1,end:1.2,speaker:'b'}];const groups=wordGroups(w);assert.deepEqual(groups.map(g=>g.map(w=>w.text)),[['Xin','chào.'],['Câu'],['tiếp']]);assert.equal(groups[0][0],w[0]);});
+test('preview does not drift between speakers before a cut',()=>{const p=[{time:0,x:.8,y:.5,scene:0,mode:'crop'},{time:4,x:.2,y:.5,scene:1,mode:'crop',cut:true}];assert.equal(focusAt(p,3.9).x,.8);assert.equal(focusAt(p,4).x,.2);});
+test('preview uses fit for missing focus and face wider than portrait',()=>{assert.equal(focusAt([],3).mode,'fit');const p=focusGeometry({width:1920,height:1080},{crop_zoom:1},{mode:'crop',x:.5,face:[.2,.1,.8,.7]});assert.equal(p.mode,'fit');});
+test('face fitting matches renderer numerically',()=>{const g=focusGeometry({width:1920,height:1080},{crop_zoom:1},{mode:'crop',x:.78,face:[.69,.12,.85,.35]});assert.equal(g.cw,606);assert.equal(g.ch,1080);assert.equal(g.mode,'crop');assert.ok((g.x*1920-303)/1920<=.69);});

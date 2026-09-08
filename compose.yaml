@@ -1,0 +1,25 @@
+name: talkcut-studio
+services:
+  studio:
+    build: .
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PORT:-8092}:8092"
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /data
+      SOURCE_ROOT: /sources
+      RENDER_THREADS: ${RENDER_THREADS:-4}
+    volumes:
+      - studio-data:/data
+      - ${SOURCE_DIR:-./sources}:/sources:ro
+    shm_size: 256mb
+    stop_grace_period: 30s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  studio-data:

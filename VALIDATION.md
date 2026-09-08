@@ -1,0 +1,43 @@
+# Kiểm tra thực tế
+
+Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, Docker Desktop; container Linux ARM64.
+
+## Đã kiểm tra
+
+- Frontend production build bằng Vite.
+- Bộ kiểm thử: 24 bài về timestamp STT, karaoke đúng từng sự kiện phát âm, escape ASS, crop/zoom, watermark chữ và ảnh, kiểm tra URL YouTube, chống thoát thư mục qua symlink/path traversal, ánh xạ đường dẫn host vào Docker, giới hạn thời gian, deduplicate clip, snapshot render, áp dụng thương hiệu theo lô, lỗi upload và dữ liệu polling gọn.
+- Google Gemini 3.8 Flash gọi thực tế bằng key hiện có: thành công.
+- Google Gemini 3.5 Transcribe gọi thực tế với file người dùng cung cấp: 176 từ có timestamp, có nhãn giọng nói; Gemini đề xuất 2 clip với thời lượng khoảng 25 và 28 giây.
+- Google TTS gọi thực tế: tạo intro tiếng Việt. Nhận dạng lại audio đã tạo cho ra đúng câu: “Một góc nhìn về trách nhiệm và khát vọng của người trẻ. Cùng lắng nghe câu chuyện sau đây.”
+- Google Search grounding gọi thực tế: trả 2 nguồn chính thức của Google cho câu hỏi kiểm thử tài liệu model.
+- Dựng từ nguồn 576 × 1024 thành MP4 1080 × 1920, H.264, có âm thanh.
+- Bản 37,371 giây: thẻ tóm tắt, intro tiếng Việt, phần nói gốc với karaoke, watermark.
+- Bản 34,700 giây: ảnh nền intro do upload, AI chọn vùng chữ, Google TTS, phần nói với karaoke, watermark, nhạc thử có ducking, outro 2 giây vốn không có audio. File ghép hoàn chỉnh có audio hợp lệ.
+- Tạo fixture ngang 1920 × 1080 từ 8 giây nguồn mẫu, chuyển người nói từ vùng trái sang phải ở giây 4. Gemini xác định hai vùng; OpenCV sửa mốc chuyển sang đúng 4,0 giây theo khung quan sát. File crop cuối 1080 × 1920; kiểm tra khung trước/sau chuyển cảnh.
+- Biểu thức crop với 175 keyframe chạy được bằng FFmpeg.
+- Kiểm tra trực quan khung tóm tắt, intro, phụ đề, crop ngang và layout background bằng ảnh trích từ MP4 thật.
+- Browser: nhập/xem nguồn, bật intro, sửa text, lưu, xếp hàng render, chuyển panel phụ đề/thương hiệu, lưu opacity watermark, thư viện bản xuất và liên kết tải. Không thấy lỗi JavaScript trong lượt kiểm tra.
+- Responsive tại 390 × 844: chiều rộng tài liệu bằng chiều rộng viewport, không tràn ngang toàn trang; danh sách clip cuộn ngang riêng.
+- Render trực tiếp trong Docker qua hàng đợi API: tạo thêm bản 37,834 giây, 1080 × 1920, H.264, audio AAC; file tải xuống được lấy từ container.
+- Docker image build thành công; dịch vụ chạy non-root, health endpoint hoạt động; giữ nguồn, 2 clip và các bản xuất sau recreate container. Cổng host bind ở loopback.
+
+## Cập nhật kiểm tra 08/09/2026
+
+- 94 bài Python và 4 bài JavaScript đạt; frontend production build và Docker build đạt. Có kiểm thử FFmpeg thật với 1.200 mốc crop và 300 khoảng giữ toàn khung, tránh giới hạn độ sâu biểu thức trên clip dài.
+- Nguồn thực tế: tọa đàm VnExpress 43:01, 1920 × 1080, 8.704 từ đã có trong thư viện. Giữ dữ liệu người dùng và sao lưu SQLite trước cập nhật.
+- Google phân tích audio và hình ảnh hai đoạn thật: cảnh toàn 32 giây (từ 19:38) và cảnh cận 20 giây (từ 25:14). Đã dựng cả hai thành 1080 × 1920 có audio, kiểm tra ảnh trích: cảnh toàn theo khách mời bên phải, cảnh cận giữ đầy đủ mặt MC, cảnh người nghe giữ toàn hình và tiếp tục audio.
+- Phân tích focus hoàn tất cho clip “Chiến lược R&D và bài toán ưu đãi thuế công nghệ cao”, từ 25:10.28 đến 30:01.18. Editor và render dùng chung cache phiên bản `speaker-shots-v2.2`.
+- Browser thật: kiểm tra câu/cụm lời thoại, tua theo câu, crop đúng người trong khung ở 25:15.40; AI gợi ý lời dẫn, hai lớp intro, đổi cách viết tiêu đề, kéo vị trí, lưu và tải lại. Bố cục intro được kiểm tra bằng PNG 1080 × 1920 của bộ dựng: toàn bộ chữ nằm ngoài logo MISA News.
+- Google Kore tạo mẫu chào 4,72 giây; STT nhận dạng lại đúng các từ trong câu mẫu người dùng yêu cầu. Kiểm tra audio mẫu trong trình duyệt và bảng bản đọc/trace.
+- Bộ chuẩn hóa TTS kiểm thử năm, ngày, số lượng, thập phân, tiền, giờ, dấu tăng/giảm, khoảng số, số văn bản, mapping cố định và các trường hợp mơ hồ cần duyệt; bản đọc tách khỏi văn bản hiển thị. Kiểm tra cache giọng và việc hủy hiệu lực bản duyệt khi đổi lời dẫn.
+- Xuất hoàn chỉnh qua hàng đợi Docker: 310,034 giây, 1080 × 1920, H.264/AAC, 133,16 MB. Có thẻ tóm tắt, intro hai lớp + voice off, talk gốc 290,9 giây với karaoke/focus, outro, nhạc nền ducking và watermark. Job `c7d2eb3d10ec470abd8fa004cefdd783` hoàn tất 100%; export `840fc0b9018a4e6c92efd39f57aa718a` trong thư viện. Bản sao: `../talkcut-vnexpress-fullhd.mp4`.
+- Ảnh trích từ nội dung thật tại giây 8/20/94,75 xác nhận lần lượt chân dung MC đủ mặt, khách mời bên phải cảnh toàn và cảnh người nghe giữ toàn hình.
+- Giải mã toàn bộ MP4 cuối bằng FFmpeg không báo lỗi; endpoint tải trả HTTP 206 đúng byte range. Sau recreate cuối, health `ok`, bản xuất còn trong volume. Kiểm tra tua từ intro sang cảnh 00:19 đưa video đến đúng 25:29.447 sau khi tải metadata.
+
+## Giới hạn còn lại
+
+- Chưa đo precision/recall phân loại cảnh hoặc người nói trên một tập tọa đàm lớn. Kiểm tra trực quan ở các mốc mẫu không bảo đảm mọi frame trong nguồn dài đều đúng.
+- Chưa benchmark xử lý nhiều giờ trên kho nguồn lớn hoặc khả năng chọn đúng người nói trong cảnh nhiều người nói chồng.
+- Không đo sai số forced alignment thủ công trên từng từ. Mốc từ là kết quả STT, có thể cần sửa/duyệt với nguồn khó.
+- Crop và ảnh intro được dùng chung giữa preview/render; nhạc, voice off và chuyển đoạn cần duyệt trên MP4 cuối. AI phân loại chưa chắc chắn sẽ giữ toàn hình; không tự xóa audio hoặc suy diễn một chân dung không hiện diện trong source.
+- Chưa triển khai toàn bộ workflow SSML/NER/fact-check/danh bạ doanh nghiệp của tài liệu TTS tham khảo. Google có thể thay đổi ngữ điệu giữa các lần sinh audio.
