@@ -45,3 +45,6 @@ v5 adds SQLite preset CRUD, a four-section inspector with main subtabs, .65-seco
 113 Python + 5 JS tests passed. Actual 22s crop/Mix proof for clip 3 is outside Git at ../talkcut-v5-clip3-preview.mp4. See VALIDATION.md for full evidence. Current derived layout is portrait-v5.1; older calm-v4.2 notes above describe history.
 
 Final v5 render job 57daddb8270c43b59298bc288cdb7e80 completed as export 1d053b99ed124cfb9366d3231462ff28: 302.367s, 1080×1920 H.264/AAC, 138678431 bytes. Full decode and range download passed. Main remains exactly 8727 frames / 290.9s. File ../talkcut-v5-fullhd.mp4. Old exports remain unchanged; select the new export to review Mix. No stable acceptance yet.
+
+Final candidate is v0.5.0-rc.2, with new mix_seconds storage preserving the older transition_seconds range so v4 rollback can read current records. v0.5.0-rc.1 is an internal pre-compatibility checkpoint. Final suite: 114 Python + 5 JS.
+Rollback to v0.4.0-rc.1 was exercised after normalization: all 7 clip GETs returned 200. Returned to v5 with mix .65 and all 2 sources / 7 clips / 7 exports / 1 preset intact. Data was not reverted.

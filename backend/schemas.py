@@ -30,8 +30,12 @@ class Settings(BaseModel):
     def migrate_removed_summary(cls, value):
         if isinstance(value, dict):
             value={**value, 'summary_enabled':False}
-            if value.get('pacing_version', 4)<5 and 'crop_mode' in value and 'transition_seconds' in value:
-                value={**value,'transition_seconds':max(.65,value.get('transition_seconds',.24)),'pacing_version':5}
+            # Preserve the legacy field's range so a v4 image can still open
+            # the same database after rollback. New Mix uses its own field.
+            if 'mix_seconds' not in value:
+                value['mix_seconds']=value.get('transition_seconds',.65) if value.get('pacing_version')==5 else .65
+            if value.get('transition_seconds',.24)>.5:value['transition_seconds']=.24
+            value['pacing_version']=5
         return value
 
     summary_enabled: bool = False
@@ -45,7 +49,8 @@ class Settings(BaseModel):
     calm_short_shots: bool = True
     calm_max_seconds: float = Field(default=4, ge=1, le=6)
     pacing_version: int = 5
-    transition_seconds: float = Field(default=.65, ge=0, le=1.2)
+    transition_seconds: float = Field(default=.24, ge=0, le=.5)
+    mix_seconds: float = Field(default=.65, ge=0, le=1.2)
     intro_title_text: str = Field(default='', max_length=180)
     intro_title_highlight: str = Field(default='', max_length=100)
     intro_title_highlight_color: str = Field(default='#ff7300', pattern=r'^#[0-9a-fA-F]{6}$')

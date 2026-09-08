@@ -26,17 +26,17 @@ export function MotionPreview({video,clip,plan,points,info,media}){
     if(p.mode==='fit'){const scale=Math.min(W/v.videoWidth,H/v.videoHeight),w=v.videoWidth*scale,h=v.videoHeight*scale;c.drawImage(v,(W-w)/2,(H-h)/2,w,h);}
     else{const cw=p.cw/info.width*v.videoWidth,ch=p.ch/info.height*v.videoHeight,x=Math.max(0,Math.min(v.videoWidth-cw,p.x*v.videoWidth-cw/2)),y=Math.max(0,Math.min(v.videoHeight-ch,p.y*v.videoHeight-ch/2));c.drawImage(v,x,y,cw,ch,0,0,W,H);}
    }
-   const cutIndex=cuts.findIndex((cut,i)=>t>=cut&&t<cut+Math.min(s.transition_seconds||0,(cuts[i+1]-cut)*.8||s.transition_seconds||0));
+   const cutIndex=cuts.findIndex((cut,i)=>t>=cut&&t<cut+Math.min(s.mix_seconds||0,(cuts[i+1]-cut)*.8||s.mix_seconds||0));
    const cut=cutIndex>=0?cuts[cutIndex]:null;
    if(cut!==activeCut){outgoing=cut!==null?previous:null;activeCut=cut;}
    ctx.globalAlpha=1;ctx.drawImage(frame,0,0);
-   if(outgoing&&cut!==null){const duration=Math.min(s.transition_seconds,(cuts[cutIndex+1]-cut)*.8||s.transition_seconds);ctx.globalAlpha=Math.max(0,1-(t-cut)/duration);ctx.drawImage(outgoing,0,0);ctx.globalAlpha=1;}
+   if(outgoing&&cut!==null){const duration=Math.min(s.mix_seconds,(cuts[cutIndex+1]-cut)*.8||s.mix_seconds);ctx.globalAlpha=Math.max(0,1-(t-cut)/duration);ctx.drawImage(outgoing,0,0);ctx.globalAlpha=1;}
    previous=frame;
   }
   const refresh=()=>{last=-1;draw();};const tick=()=>{draw();frameId=v.requestVideoFrameCallback(tick);};
   v.addEventListener('seeked',refresh);v.addEventListener('loadeddata',refresh);v.addEventListener('timeupdate',draw);
   draw();if(v.requestVideoFrameCallback)frameId=v.requestVideoFrameCallback(tick);
   return()=>{disposed=true;if(frameId)v.cancelVideoFrameCallback(frameId);v.removeEventListener('seeked',refresh);v.removeEventListener('loadeddata',refresh);v.removeEventListener('timeupdate',draw);};
- },[clip.id,clip.start,clip.end,plan,points,s.crop_mode,s.crop_x,s.crop_zoom,s.calm_short_shots,s.transition_seconds,info.width,info.height]);
+ },[clip.id,clip.start,clip.end,plan,points,s.crop_mode,s.crop_x,s.crop_zoom,s.calm_short_shots,s.mix_seconds,info.width,info.height]);
  return <canvas ref={canvas} className="motion-preview" aria-label="Xem trước crop ổn định và chuyển cảnh hòa trộn"/>;
 }

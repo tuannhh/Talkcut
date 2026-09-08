@@ -328,7 +328,7 @@ def render(source, clip, words, settings, directory, progress):
     vf = crop_filter(info, settings, track)
     from .transitions import transition_plan,visual_filters
     pacing=transition_plan(track,info,settings)
-    vf += ','+visual_filters(pacing,settings.get('transition_seconds',.24))
+    vf += ','+visual_filters(pacing,settings.get('mix_seconds',.24))
     if settings['caption_enabled']:
         if not words:
             raise ValueError('Chưa có transcript. Phân tích nguồn trước hoặc tắt phụ đề.')
