@@ -69,21 +69,21 @@ def test_focus_abstains_and_fills_missing_scenes():
     assert focus.sanitize([{'start':float('nan'),'end':5,'kind':'speaker','confidence':.99,'visible_speaking':True,'keyframes':[]}],5)[0]['kind']=='uncertain'
 
 
-def test_face_headroom_geometry_and_fit_when_too_large():
+def test_face_headroom_geometry_keeps_portrait_for_oversized_source_face():
     info={'width':1920,'height':1080};settings=Settings().model_dump()
     p={'x':.78,'face':[.69,.12,.85,.35],'mode':'crop'}
     g=focus.geometry(info,settings,p)
     left=(g['x']*1920-g['cw']/2)/1920;right=left+g['cw']/1920
     assert g['mode']=='crop' and left<=.69 and right>=.85
     huge=focus.geometry(info,settings,{'x':.5,'face':[.2,.05,.8,.8],'mode':'crop'})
-    assert huge['mode']=='fit'
-    assert focus.geometry(info,settings,{'x':.78,'mode':'fit'})['mode']=='fit'
+    assert huge['mode']=='crop' and huge['x']==.5
+    assert focus.geometry(info,settings,{'x':.78,'mode':'fit'})['mode']=='crop'
 
 
-def test_scene_change_jumps_and_broll_fit_does_not_trim_audio():
+def test_scene_change_jumps_and_vertical_broll_does_not_trim_audio():
     track={'start':10,'end':20,'keyframes':[{'time':0,'x':.75,'face':[.7,.1,.8,.3],'mode':'crop','scene':0},{'time':3,'x':.2,'face':[.15,.1,.25,.3],'mode':'crop','scene':1,'cut':True},{'time':5,'x':.5,'mode':'fit','scene':2}]}
     vf=crop_filter({'width':1920,'height':1080},Settings().model_dump(),track)
-    assert 'gte(t,3)' in vf and 'overlay' in vf and 'gte(t,5)*lt(t,10)' in vf
+    assert 'gte(t,3)' in vf and 'pad=' not in vf and 'gte(t,5)' in vf
     assert 'trim' not in vf and 'select=' not in vf
 
 

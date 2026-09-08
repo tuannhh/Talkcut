@@ -35,3 +35,13 @@ v4 fixes: bottom alpha intro artwork with no black title box; direct sentence/fr
 The first v4 trial render cc7326e77fa54dc38c96bf285f49ec3b was intentionally superseded when native frame drift was discovered; do not retry that old snapshot as acceptance evidence.
 
 Final v4 job a6a26e1d73d54f758ae59b78081a9d49 completed: export 8ef839c948664b1b8e40986c7e1a3d44, 302.367 s, 1080×1920 H.264/AAC, 133747786 bytes. Entire MP4 decoded without errors; HTTP Range 206 verified. Final browser tests covered direct sentence/frame edit → Save with unchanged original timing, then restored original text. 107 Python + 5 JS tests passed. Runtime keeps 2 sources, 7 clips, 6 exports. User voice profile is now female North/1.2x, and selected freeze frame 3; preserve these latest settings. See VALIDATION.md.
+
+## v5 current user correction
+
+User requires full vertical crop for other clips too, section-specific settings (Intro/Main/Outro), reusable presets, and one softer/longer Mix. This supersedes the historical automatic letterboxing fallback. Main auto mode stays portrait; uncertain visual shots retain their kind label instead of being silently labelled a speaking person. Provisional visual-only portrait preview is separate from confirmed focus and does not skip Google analysis.
+
+v5 adds SQLite preset CRUD, a four-section inspector with main subtabs, .65-second linear Mix (up to 1.2s), short same-voice angle holds and reaction holds. Clip 1 now has 50 Mix boundaries instead of 60 original cuts; clip 3 is all-portrait. Preset `12442d0b812d4b7e9d2cdada420a328a` / `MISA News · Dọc 9:16` was created from clip 1. Cross-clip application verified through UI; clip 3 was restored after test. Keep preset and source/clip/export data. pre-v5-backup.sqlite exists; v0.4.0-rc.1 remains a known-issues rollback checkpoint, not accepted stable.
+
+113 Python + 5 JS tests passed. Actual 22s crop/Mix proof for clip 3 is outside Git at ../talkcut-v5-clip3-preview.mp4. See VALIDATION.md for full evidence. Current derived layout is portrait-v5.1; older calm-v4.2 notes above describe history.
+
+Final v5 render job 57daddb8270c43b59298bc288cdb7e80 completed as export 1d053b99ed124cfb9366d3231462ff28: 302.367s, 1080×1920 H.264/AAC, 138678431 bytes. Full decode and range download passed. Main remains exactly 8727 frames / 290.9s. File ../talkcut-v5-fullhd.mp4. Old exports remain unchanged; select the new export to review Mix. No stable acceptance yet.

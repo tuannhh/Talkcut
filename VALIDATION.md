@@ -64,3 +64,15 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
 - Job `a6a26e1d73d54f758ae59b78081a9d49` hoàn tất 100%; export `8ef839c948664b1b8e40986c7e1a3d44`: 302,367 giây, 1080×1920, H.264 30 fps/AAC, 133.747.786 byte. Có intro voice/karaoke, talk 290,9 giây, outro, music/watermark. Bản sao ngoài Git: `../talkcut-v4-fullhd.mp4`.
 - Giải mã toàn bộ MP4 cuối thành công, không báo lỗi; endpoint tải trả HTTP 206, bytes 0–1023/133747786. Sau triển khai UI cuối còn đủ 2 nguồn, 7 clip, 6 bản xuất.
 - Đã chạy rollback về image build từ commit 200b2ef rồi trở lại bản phát triển, giữ database/media. Snapshot pre-v4-backup.sqlite và image v0.3.0-rc.1 là dự phòng có lỗi đã biết, không phải stable. Bản v4 là release candidate, chỉ chốt stable/handoff khi người dùng xác nhận dùng ổn.
+
+## Cập nhật v5 — 08/09/2026: crop dọc xuyên suốt, preset và Mix
+
+- 113 test Python + 5 test JavaScript đạt. Docker/Vite build đạt. Kiểm thử mới gồm preset CRUD, không ghi đè record khác loại, giữ riêng nội dung clip đích, nâng mặc định Mix một lần, không che đổi người nói thật, Mix sát cuối clip giữ đủ số frame/thời lượng.
+- Browser thật: Intro / Nội dung chính / Outro / Dùng chung tách riêng; crop và Mix nằm trong Nội dung chính; lời thoại vẫn sửa trực tiếp. Xem clip 3 trong Light mode: khung dọc lấp đầy, không có dải đen do tự giữ video ngang.
+- Tạo preset `MISA News · Dọc 9:16` từ clip 1. Áp dụng sang clip 3: voice/style đúng preset; tiêu đề, 1136,48–1418,38 giây, ảnh nhân vật và lời thoại hiệu dụng không đổi. AI tạo lời dẫn mới 179 ký tự cho nội dung clip 3. Đã lưu qua UI, kiểm tra backend rồi khôi phục thiết lập riêng clip 3 sau test. Preset vẫn được giữ cho người dùng.
+- Các mốc crop trên clip 1 (635 mẫu) và clip 3 (601 mẫu) đều là crop dọc; không có box mặt được nhận diện nằm ngoài vùng crop trong lượt kiểm tra hình học. Đây không phải bảo đảm độ chính xác xác định người nói ở mọi frame.
+- Clip 1 có 60 cut camera gốc, 10 khoảng giữ hình và 50 điểm Mix; clip 3 có 45 cut, 4 khoảng giữ hình. Giữ hình qua đoạn ngắn không xóa lời nói, không che một lượt nói mới khi STT xác định đổi speaker.
+- Dựng thật 22 giây đầu clip 3, 1080×1920 có audio, dùng toàn bộ pipeline crop + Mix mới. Ảnh trích tại 11 giây là chân dung MC đầy khung; 10,4 giây xác nhận đang hòa hai hình, sau Mix hình trở lại nét. Bản sao ngoài Git: `../talkcut-v5-clip3-preview.mp4`.
+- Clip 4 chưa có focus AI: pass xem trước bằng phát hiện mặt tạo 181 mẫu, 89 mẫu có mặt. Được gắn `provisional`, không thay thế hoặc ngăn tác vụ phân tích người nói bằng audio.
+- Bản đầy đủ: job `57daddb8270c43b59298bc288cdb7e80` hoàn tất 100%, export `1d053b99ed124cfb9366d3231462ff28`, 302,367 giây, 1080×1920 H.264/AAC, 138.678.431 byte. Nội dung chính giữ đúng 290,900 giây / 8.727 frame ở 30 fps; không rút thời lượng talk. Intro, karaoke, outro, nhạc và watermark đều có trong bản ghép. File ngoài Git: `../talkcut-v5-fullhd.mp4`.
+- Giải mã toàn bộ MP4 bằng FFmpeg không báo lỗi; tải HTTP 206 đúng bytes 0–1023/138678431. Clip 2 cũng kiểm tra hình học 507 mốc, không có box mặt đã nhận diện vượt vùng crop.

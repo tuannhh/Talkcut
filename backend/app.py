@@ -7,7 +7,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
-from . import config, store, pipeline, google_ai
+from . import config, store, pipeline, google_ai, presets
 from .media import probe, MediaError
 from .schemas import ImportRequest, AnalyzeRequest, ClipEdit, Settings, BatchBrand
 
@@ -92,6 +92,34 @@ async def upload(file, target, limit):
     finally:
         await file.close()
     return size
+
+
+@app.get('/api/presets')
+def list_presets():
+    return store.listing('preset')
+
+
+@app.post('/api/presets')
+def create_preset(body: presets.PresetRequest):
+    return presets.save(body)
+
+
+@app.put('/api/presets/{id}')
+def update_preset(id: str, body: presets.PresetRequest):
+    return presets.save(body,id)
+
+
+@app.post('/api/presets/{id}/apply')
+def apply_preset(id: str, body: Settings):
+    return {'settings':presets.apply(id,body.model_dump())}
+
+
+@app.delete('/api/presets/{id}')
+def delete_preset(id: str):
+    store.get(id,'preset')
+    with store.connect() as db:
+        db.execute("DELETE FROM records WHERE id=? AND kind='preset'",(id,))
+    return {'deleted':True}
 
 
 @app.post('/api/sources/upload')
@@ -282,12 +310,16 @@ def get_focus(id: str):
         from .intro_art import freeze
         directory=focusing.cache_dir(config.DATA/source['path'],clip)
         for h in plan['holds']:
-            path=directory/f'hold-v4.2-{h["frame_time"]:.3f}-{settings["crop_zoom"]}.jpg'
+            path=directory/f'hold-v5-{h["frame_time"]:.3f}-{settings["crop_zoom"]}.jpg'
             if not path.exists():
                 temp=path.with_name(uuid.uuid4().hex+'.jpg')
                 freeze(config.DATA/source['path'],{**clip,'settings':settings},clip['start']+h['frame_time'],temp);temp.replace(path)
             h['path']=str(path.relative_to(config.DATA))
-    return {'plan':plan,'labels':focusing.LABELS}
+    preview_plan=None
+    if not plan:
+        preview_source=config.DATA/source.get('preview_path',source['path'])
+        preview_plan=focusing.prepared_track(focusing.visual_preview(config.DATA/source['path'],clip,preview_source),source,Settings.model_validate(clip.get('settings',{})).model_dump())
+    return {'plan':plan,'preview_plan':preview_plan,'labels':focusing.LABELS}
 
 
 @app.post('/api/clips/{id}/focus')

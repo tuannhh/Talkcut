@@ -24,9 +24,22 @@ def visual_filters(plan,seconds):
         expr=balanced_sum([f'gte(t,{h["start"]})*lt(t,{h["end"]})' for h in plan['holds']])
         filters += [f"select='not({expr})'",'fps=30:round=up']
     if seconds and plan['cuts']:
-        frames=max(2,round(seconds*30));duration=frames/30
-        active=balanced_sum([f'gte(t,{t})*lt(t,{t+duration:.6f})' for t in plan['cuts']])
-        # tmix's disabled path can return older timestamps in FFmpeg. Always
-        # feed its buffer and gate the overlay, keeping the clean stream's PTS.
-        filters += [f"split[clean][mixinput];[mixinput]tmix=frames={frames}:weights='1'[mixed];[clean][mixed]overlay=enable='{active}':eof_action=pass"]
+        windows=mix_windows(plan['cuts'],seconds)
+        # Hold the outgoing image and dissolve it into the moving incoming shot.
+        # Both branches keep the original PTS: speech and subtitles never shift.
+        drop=balanced_sum([f'gte(t,{a})*lt(t,{b})' for a,b in windows])
+        # Commands run AFTER the compositor: upstream framesync may prefetch
+        # future frames, which would otherwise change opacity too early.
+        commands=[]
+        for a,b in windows:
+            start=max(0,math.ceil(a*30-1e-6)/30-1/30-.00001)
+            end=start+b-a
+            commands.extend([f'{start:.6f}-{end:.6f} [expr] blend@mix all_opacity 1-TI',f'{end:.6f} blend@mix all_opacity 0'])
+        commands=';'.join(commands)
+        filters += [f"split[incoming][outgoing];[outgoing]select='not({drop})',fps=30:round=up,tpad=stop_mode=clone:stop_duration=2[held];[held][incoming]blend@mix=all_mode=normal:all_opacity=0:shortest=1,sendcmd=c='{commands}'"]
     return ','.join(filters)
+
+
+def mix_windows(cuts,seconds):
+    times=sorted(set(t for t in cuts if t>0))
+    return [(t,round(t+min(seconds,(times[i+1]-t)*.8 if i+1<len(times) else seconds),6)) for i,t in enumerate(times)]

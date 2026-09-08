@@ -22,3 +22,12 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
 - Visual-only frame mix around cuts, optional 1.4-second reaction hold at 94.04–95.44 on the sample. Source-FPS-aware thumbnail uses preceding frame 94.00, not next incoming frame. Conversion to 30 fps rounds upward to avoid bringing incoming frames into the held interval early. Audio/ASS timing remains unchanged. 60 source cuts, 59 after optional hold; no claim of removing most original camera edits.
 - Actual Linux FFmpeg test kept 90 frames for a 3-second fixture, held red through a blue insert, showed red/green mixture at transition and clean green after it. Native-cut 8-second real-media proof checked incoming face and brief blend around 15.76, eliminating the empty crop seen in the first trial.
 - 107 Python tests and 5 JavaScript tests passed; production build passed. Full-media evidence appended to VALIDATION.md after render finishes.
+
+## 2026-09-08 — v5 candidate: portrait throughout, section editor, reusable presets
+
+- Fixed automatic letterboxing: inferred uncertain/listener shots now use visible face geometry for a full-height portrait; no automatic fit mode. While audio-aware AI runs, a separate visual-only face preview supplies provisional crop and is labelled accordingly.
+- Bàn dựng now separates Intro / Nội dung chính / Outro / Dùng chung. Main has trim, focus & Mix, and captions subpanels. Timeline buttons open the corresponding section; outro has a dedicated preview.
+- SQLite presets support create, update, delete and apply. Styles/assets/voice transfer; narration, title/highlight words, source portrait and trim remain clip-specific. Applying an intro preset to an empty narration requests a new AI suggestion for that clip.
+- Replaced temporal frame averaging with one two-image Mix (outgoing held frame → moving incoming shot), default .65s, adjustable to 1.2s. Runtime opacity commands run after the compositor to avoid framesync prefetch changing opacity early; the schedule leads by one output frame. The last cut cannot shorten video. ASS/audio timing unchanged.
+- Short same-voice angle inserts can hold the preceding image only inside one continuous measured voice turn. Reaction/transition inserts can hold up to user limit. On real clip 1: 60 native camera cuts, 10 holds, 50 visible Mix points; clip 3: 45 cuts, 4 holds. This is editing cadence, not a precision claim for speaker recognition.
+- Keep v0.4.0-rc.1 as rollback image/tag. v5 remains a candidate until the user accepts it. pre-v5-backup.sqlite created before changes.

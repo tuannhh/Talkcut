@@ -1,4 +1,4 @@
-"""Audio-aware shot planning. Unknown/off-screen shots keep the full image and audio.
+"""Audio-aware shot planning. Portrait framing never interrupts the source speech.
 
 The same versioned plan is used in the browser and FFmpeg; face detection refines
 geometry only and never decides who is speaking.
@@ -32,7 +32,7 @@ def _cached(source, clip):
     path = cache_dir(source, clip) / 'focus.json'
     if not path.exists(): return None
     result=json.loads(path.read_text())
-    if result.get('layout_version')!='calm-v4.2':
+    if result.get('layout_version')!='portrait-v5.1':
         enrich_reactions(path.parent,result)
         visual_layout(path.parent,result,source,clip)
         import uuid
@@ -85,12 +85,12 @@ def sanitize(raw, duration):
 
 
 def geometry(info, settings, p):
-    """Safe portrait window: face + headroom stay inside, otherwise fit."""
+    """Portrait window with face/headroom constraints; only explicit fit letterboxes."""
     iw, ih = info['width'], info['height']
     zoom = settings.get('crop_zoom', 1)
     cw = max(2, int(min(iw, ih*9/16)/zoom)//2*2)
     ch = max(2, int(min(ih, iw*16/9)/zoom)//2*2)
-    if p.get('mode') == 'fit':
+    if settings.get('crop_mode') == 'fit':
         return {'mode':'fit', 'x':.5, 'y':.5, 'cw':cw, 'ch':ch}
     face = p.get('face')
     cx = p.get('x', .5)
@@ -102,7 +102,7 @@ def geometry(info, settings, p):
         left,right = max(0,x1-fw*.15),min(1,x2+fw*.15)
         top,bottom = max(0,y1-fh*.5),min(1,y2+fh*.3)
         if (right-left)*iw > cw or (bottom-top)*ih > ch:
-            return {'mode':'fit','x':.5,'y':.5,'cw':cw,'ch':ch}
+            return {'mode':'crop','x':max(cw/iw/2,min(1-cw/iw/2,(x1+x2)/2)),'y':max(ch/ih/2,min(1-ch/ih/2,(y1+y2)/2)),'cw':cw,'ch':ch}
         cx = max(right-cw/iw/2, min(left+cw/iw/2,cx))
         # Eyes near upper third when zoomed; preserve the original vertical view otherwise.
         cy = max(bottom-ch/ih/2, min(top+ch/ih/2, (y1+y2)/2+ch/ih*.17))
@@ -229,7 +229,7 @@ def enrich_reactions(directory, result):
     caps={}
     try:
         for p in result['keyframes']:
-            if p.get('kind')!='reaction':continue
+            if p.get('mode')!='fit' and p.get('kind')!='reaction':continue
             index=int(p['time']//30);proxy=directory/f'shots-{index}.mp4'
             if not proxy.exists():continue
             cap=caps.setdefault(index,cv2.VideoCapture(str(proxy))) if index not in caps else caps[index]
@@ -237,18 +237,25 @@ def enrich_reactions(directory, result):
             ok,img=cap.read()
             if not ok:continue
             boxes=detector.detectMultiScale(cv2.cvtColor(img,cv2.COLOR_BGR2GRAY),scaleFactor=1.1,minNeighbors=5,minSize=(24,24))
-            if len(boxes)==1:
+            if len(boxes):
+                boxes=sorted(boxes,key=lambda b:abs((b[0]+b[2]/2)/img.shape[1]-p['x'])) if p.get('face') else sorted(boxes,key=lambda b:b[2]*b[3],reverse=True)
                 x,y,w,h=[float(v) for v in boxes[0]];ih,iw=img.shape[:2]
                 p.update(face=[x/iw,y/ih,(x+w)/iw,(y+h)/ih],x=(x+w/2)/iw,mode='crop',visual_context=True)
     finally:
         for cap in caps.values():cap.release()
     result['layout_version']='stable-v3'
-    result['note']='Giữ bố cục ổn định trong từng cảnh; cảnh người nghe giữ lời thoại và chân dung khi thấy rõ. Cảnh chưa đủ hình ảnh giữ toàn khung.'
+    result['note']='Giữ bố cục ổn định trong từng cảnh; cảnh người nghe giữ lời thoại và chân dung khi thấy rõ. Luôn crop dọc 9:16; cảnh chưa chắc người nói ưu tiên khuôn mặt đang thấy và giữ nguyên lời thoại.'
 
 
 def prepared_track(track, info, settings):
     import statistics
-    points=[{**p,**geometry(info,settings,p)} for p in camera_points(track)]
+    raw=camera_points(track)
+    for p in raw:
+        if not p.get('face'):
+            nearby=[q for q in raw if q.get('scene')==p.get('scene') and q.get('face')]
+            if nearby:
+                q=min(nearby,key=lambda q:abs(q['time']-p['time']));p.update(face=q['face'],x=q['x'])
+    points=[{**p,**geometry(info,settings,p)} for p in raw]
     # Lock a shot to one feasible crop center. Only move when the subject actually
     # leaves that window; intersect face-safe bounds so smoothing never clips faces.
     groups=[]
@@ -332,8 +339,19 @@ def visual_layout(directory,result,source=None,clip=None):
                 refined.append(round(best[1] if best[0]>24 else cut,5))
         finally:cap.release()
         cuts=sorted(set(refined))
+    if source and clip:
+        transcript=Path(source).parent/'transcript.json'
+        words=clip.get('words') or (json.loads(transcript.read_text()) if transcript.exists() else [])
+        turns=[]
+        for w in words:
+            if not w.get('speaker') or w['end']<=clip['start'] or w['start']>=clip['end']:continue
+            a=max(0,w['start']-clip['start']);b=min(clip['end']-clip['start'],w['end']-clip['start'])
+            if turns and turns[-1]['speaker']==w['speaker'] and a-turns[-1]['end']<2:
+                turns[-1]['end']=max(b,turns[-1]['end'])
+            else:turns.append({'start':a,'end':b,'speaker':w['speaker']})
+        result['speech_turns']=turns
     result['visual_cuts']=cuts
-    result['layout_version']='calm-v4.2'
+    result['layout_version']='portrait-v5.1'
 
 
 def camera_points(track):
@@ -355,11 +373,56 @@ def camera_points(track):
 def calm_holds(track,settings):
     if not settings.get('calm_short_shots',True):return []
     scenes=track.get('scenes',[]);cuts=track.get('visual_cuts',[]);holds=[]
+    limit=settings.get('calm_max_seconds',4)
     for i,s in enumerate(scenes):
-        if not 0<i<len(scenes)-1 or s['kind']!='reaction' or not .35<=s['end']-s['start']<=2:continue
+        if not 0<i<len(scenes)-1 or s['kind'] not in ('reaction','wrong_shot','broken','transition') or not .35<=s['end']-s['start']<=limit:continue
         if scenes[i-1]['kind']!='speaker' or scenes[i+1]['kind']!='speaker':continue
         start=min(cuts,key=lambda t:abs(t-s['start'])) if cuts else s['start']
         end=min(cuts,key=lambda t:abs(t-s['end'])) if cuts else s['end']
-        if abs(start-s['start'])>.35 or abs(end-s['end'])>.35 or not .35<=end-start<=2:continue
-        holds.append({'start':start,'end':end,'frame_time':round(max(0,start-1/track.get('source_fps',30)),5),'reason':'Giữ hình qua cảnh người nghe ngắn; lời thoại tiếp tục.'})
-    return holds
+        if abs(start-s['start'])>.35 or abs(end-s['end'])>.35 or not .35<=end-start<=limit:continue
+        holds.append({'start':start,'end':end,'frame_time':round(max(0,start-1/track.get('source_fps',30)),5),'reason':'Giữ hình qua cảnh chèn ngắn; lời thoại tiếp tục.'})
+    # Suppress a short angle insert only inside one continuous measured voice
+    # turn. A real change of speaker must remain visible; leave recovery space.
+    boundaries=[0,*cuts,track.get('end',0)-track.get('start',0)]
+    for a,b in zip(boundaries[1:-1],boundaries[2:]):
+        if not .35<=b-a<=min(2.5,limit):continue
+        if not any(turn['start']<=a-.3 and turn['end']>=b+.3 for turn in track.get('speech_turns',[])):continue
+        if any(a<h['end']+2 and b>h['start']-2 for h in holds):continue
+        holds.append({'start':a,'end':b,'frame_time':round(max(0,a-1/track.get('source_fps',30)),5),'reason':'Giữ hình qua góc máy ngắn trong cùng lượt nói.'})
+    return sorted(holds,key=lambda h:h['start'])
+
+
+def visual_preview(source,clip,preview_source=None):
+    """Fast visual-only portrait while audio-aware analysis runs separately."""
+    import cv2
+    directory=cache_dir(source,clip);directory.mkdir(exist_ok=True,parents=True)
+    path=directory/'visual-preview-v5.json'
+    with _layout_lock:
+        if path.exists():return json.loads(path.read_text())
+        cap=cv2.VideoCapture(str(preview_source or source))
+        detector=cv2.CascadeClassifier(cv2.data.haarcascades+'haarcascade_frontalface_default.xml')
+        points=[];previous=None;center=.5;scene=0
+        duration=clip['end']-clip['start'];step=max(1,duration/180)
+        try:
+            t=0
+            while t<duration:
+                cap.set(cv2.CAP_PROP_POS_MSEC,(clip['start']+t)*1000);ok,img=cap.read()
+                if not ok:break
+                h,w=img.shape[:2];img=cv2.resize(img,(480,max(2,round(h*480/w))))
+                gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY);tiny=cv2.resize(gray,(64,36))
+                cut=previous is None or float(cv2.absdiff(tiny,previous).mean())>24
+                if cut:scene+=1
+                previous=tiny
+                faces=detector.detectMultiScale(gray,scaleFactor=1.1,minNeighbors=5,minSize=(20,20))
+                p={'time':round(t,3),'mode':'crop','x':center,'scene':scene,'cut':cut,'kind':'uncertain'}
+                if len(faces):
+                    x,y,fw,fh=max(faces,key=lambda b:b[2]*b[3] if cut else b[2]*b[3]/(1+4*abs((b[0]+b[2]/2)/img.shape[1]-center)))
+                    ih,iw=img.shape[:2];center=float((x+fw/2)/iw)
+                    p.update(x=center,face=[float(x/iw),float(y/ih),float((x+fw)/iw),float((y+fh)/ih)])
+                elif cut:p['x']=.5
+                points.append(p);t+=step
+        finally:cap.release()
+        result={'start':clip['start'],'end':clip['end'],'keyframes':points,'scenes':[], 'provisional':True,'note':'Crop dọc theo khuôn mặt tạm thời; AI đang đối chiếu người nói với âm thanh.'}
+        import uuid
+        temp=path.with_name(uuid.uuid4().hex+'.tmp');temp.write_text(json.dumps(result));temp.replace(path)
+        return result

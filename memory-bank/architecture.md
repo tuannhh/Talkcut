@@ -28,3 +28,13 @@ Sources verified 2026-09-08:
 `MotionPreview` draws the same prepared crop and short holds into a canvas, mixing recent frames near the same cuts. Browser performance and display cadence can differ from the encoded file; the MP4 is acceptance evidence. `editTimedGroup` preserves measured intervals; it never divides a row duration into invented timings.
 
 `scripts/versions.py` manages local checkpoints and app-image rollback. `compose.yaml` accepts TALKCUT_IMAGE; `.active-image` keeps start.sh on a selected checkpoint. Development checkout stays intact during image rollback. `.releases` stores local image/commit/snapshot metadata and is ignored by Git. No automatic restoration of old SQLite over new edits. Before future breaking DB migrations, define an explicit restore/migration path.
+
+## v5 portrait, Mix and presets
+
+The current user request supersedes old automatic fit/letterbox fallbacks. `geometry` and prepared tracks retain 9:16 crop, refine available faces, and preserve same-shot anchors. Explicit legacy `fit` API input remains compatible, but is no longer offered in the UI. Extremely close source portraits may exceed a vertical crop's width; no invented image area is synthesized.
+
+`visual_preview` is a cached local face-detection pass at low sampling rate while audio-aware AI runs. It never marks a face as the confirmed speaker. `get_focus` returns this as `preview_plan` separately from final `plan`, so it cannot suppress the real analysis job. Raw cache version stays v2.2; derived camera/portrait layout is `portrait-v5.1`, including transcript speech turns for conservative short-angle holds.
+
+`transitions` uses select + fps to retain an outgoing frame, then normal blend opacity. Output-side sendcmd drives a linear Mix per cut; upstream commands were rejected by tests because frame prefetch could apply future opacity early. A bounded tail pad covers cuts near the end; shortest framesync preserves the original timeline. Native source timing still defines crop boundaries. Browser canvas uses the same cuts/holds and linear opacity. Documentation: https://ffmpeg.org/ffmpeg-filters.html#blend and https://ffmpeg.org/ffmpeg-filters.html#sendcmd_002c-asendcmd (checked 2026-09-08).
+
+`backend/presets.py` strips content-specific fields and validates referenced assets. `/api/presets` stores durable records in SQLite. Applying returns merged settings for review in the current editor; Save persists to that clip. It does not mutate other clips or include their transcript/timing. Presets use existing assets in the same Docker volume; relocating to another machine requires the normal volume backup.

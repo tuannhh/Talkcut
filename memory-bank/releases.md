@@ -19,3 +19,5 @@ python3 scripts/versions.py development
 Checkpoint yêu cầu Git sạch và hàng đợi rảnh, build từ đúng checkout, tạo tag và SQLite snapshot. Chỉ sau khi được người dùng xác nhận ổn mới dùng `checkpoint v0.4.0 --accepted` trên checkout đã có version tương ứng. Tag cần được push khi công bố. Không ghi đè checkpoint cũ.
 
 Rollback đổi image đang chạy, giữ checkout phát triển và dữ liệu hiện tại. start.sh tiếp tục dùng image đã chọn cho đến khi chạy development. Ảnh Docker/snapshot local không được đưa lên GitHub; chuyển máy cần build từ tag và sao lưu toàn bộ volume media + SQLite. Không tự khôi phục snapshot DB cũ lên dữ liệu mới vì sẽ mất chỉnh sửa sau checkpoint.
+
+- `v0.5.0-rc.1`: crop dọc xuyên suốt, bàn dựng theo phần, preset và Mix 0,65 giây. Bản dùng thử kế tiếp; giữ `v0.4.0-rc.1` để rollback. Chỉ chốt stable sau khi người dùng xác nhận dùng ổn.

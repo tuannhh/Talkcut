@@ -30,6 +30,8 @@ class Settings(BaseModel):
     def migrate_removed_summary(cls, value):
         if isinstance(value, dict):
             value={**value, 'summary_enabled':False}
+            if value.get('pacing_version', 4)<5 and 'crop_mode' in value and 'transition_seconds' in value:
+                value={**value,'transition_seconds':max(.65,value.get('transition_seconds',.24)),'pacing_version':5}
         return value
 
     summary_enabled: bool = False
@@ -41,7 +43,9 @@ class Settings(BaseModel):
     intro_caption_x: float = Field(default=.5, ge=.1, le=.9)
     intro_background_scale: float = Field(default=1, ge=.5, le=1.5)
     calm_short_shots: bool = True
-    transition_seconds: float = Field(default=.24, ge=0, le=.5)
+    calm_max_seconds: float = Field(default=4, ge=1, le=6)
+    pacing_version: int = 5
+    transition_seconds: float = Field(default=.65, ge=0, le=1.2)
     intro_title_text: str = Field(default='', max_length=180)
     intro_title_highlight: str = Field(default='', max_length=100)
     intro_title_highlight_color: str = Field(default='#ff7300', pattern=r'^#[0-9a-fA-F]{6}$')

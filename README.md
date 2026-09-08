@@ -171,3 +171,11 @@ python3 scripts/versions.py development
 ```
 
 Rollback đổi Docker image, giữ dữ liệu và checkout phát triển. `start.sh` giữ phiên bản đã chọn. Không tự ghi đè SQLite hiện tại bằng snapshot cũ. Khi chuyển máy, cần mang theo volume dữ liệu hoặc restore backup; Git chỉ chứa mã nguồn.
+
+### Thiết lập theo phần và preset
+
+Bàn dựng chia thành **Intro**, **Nội dung chính**, **Outro**, **Dùng chung**. Trong Nội dung chính, chọn **AI focus & Mix** để chỉnh crop dọc và độ mềm chuyển cảnh; chọn **Phụ đề** để sửa lời thoại trực tiếp.
+
+Ở đầu Bàn dựng, bấm **Lưu preset**, đặt tên rồi lưu. Sang clip khác, chọn preset → **Áp dụng** → **Lưu**. Preset dùng lại bố cục, giọng, phụ đề, Mix, watermark, nhạc và outro; giữ riêng lời dẫn, tiêu đề, ảnh nhân vật, mốc cắt. Nếu bật intro mà clip chưa có lời dẫn, AI gợi ý lời dẫn mới theo clip. Preset lưu trong volume dữ liệu, tồn tại sau khi khởi động lại Docker.
+
+Mix mặc định 0,65 giây, điều chỉnh tới 1,2 giây. “Giữ hình qua cảnh chèn ngắn” giảm thay đổi góc máy, giữ nguyên lời nói. Trong lúc AI đối chiếu người nói, bản xem trước tạm crop theo khuôn mặt và ghi rõ trạng thái.

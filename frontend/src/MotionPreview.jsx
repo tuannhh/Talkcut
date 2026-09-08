@@ -6,7 +6,7 @@ export function MotionPreview({video,clip,plan,points,info,media}){
  useEffect(()=>{
   const v=video.current,out=canvas.current;if(!v||!out)return;
   const ctx=out.getContext('2d'),W=360,H=640;out.width=W;out.height=H;
-  const count=Math.max(2,Math.round((s.transition_seconds||0)*30)),history=[];
+  let previous=null,outgoing=null,activeCut=null;
   const holds=s.calm_short_shots?plan?.holds||[]:[],images=new Map();
   for(const h of holds){const im=new Image();im.onload=()=>{last=-1;draw();};im.src=media(h.path);images.set(h.start,im);}
   let last=-1,frameId,disposed=false;
@@ -15,7 +15,7 @@ export function MotionPreview({video,clip,plan,points,info,media}){
    if(disposed||v.readyState<2)return;
    const t=v.currentTime-clip.start,index=Math.round(t*30);
    if(index===last)return;
-   if(last<0||index<last||index-last>10)history.length=0;
+   if(last<0||index<last||index-last>10){previous=null;outgoing=null;activeCut=null;}
    last=index;
    const frame=document.createElement('canvas');frame.width=W;frame.height=H;const c=frame.getContext('2d');c.fillStyle='#000';c.fillRect(0,0,W,H);
    const hold=holds.find(h=>t>=h.start&&t<h.end),im=hold&&images.get(hold.start);
@@ -26,11 +26,12 @@ export function MotionPreview({video,clip,plan,points,info,media}){
     if(p.mode==='fit'){const scale=Math.min(W/v.videoWidth,H/v.videoHeight),w=v.videoWidth*scale,h=v.videoHeight*scale;c.drawImage(v,(W-w)/2,(H-h)/2,w,h);}
     else{const cw=p.cw/info.width*v.videoWidth,ch=p.ch/info.height*v.videoHeight,x=Math.max(0,Math.min(v.videoWidth-cw,p.x*v.videoWidth-cw/2)),y=Math.max(0,Math.min(v.videoHeight-ch,p.y*v.videoHeight-ch/2));c.drawImage(v,x,y,cw,ch,0,0,W,H);}
    }
-   history.push(frame);while(history.length>count)history.shift();
-   const mixing=s.transition_seconds>0&&cuts.some(cut=>t>=cut&&t<cut+count/30);
-   ctx.clearRect(0,0,W,H);
-   if(mixing&&history.length>1){ctx.globalCompositeOperation='lighter';ctx.globalAlpha=1/history.length;for(const f of history)ctx.drawImage(f,0,0);ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;}
-   else ctx.drawImage(frame,0,0);
+   const cutIndex=cuts.findIndex((cut,i)=>t>=cut&&t<cut+Math.min(s.transition_seconds||0,(cuts[i+1]-cut)*.8||s.transition_seconds||0));
+   const cut=cutIndex>=0?cuts[cutIndex]:null;
+   if(cut!==activeCut){outgoing=cut!==null?previous:null;activeCut=cut;}
+   ctx.globalAlpha=1;ctx.drawImage(frame,0,0);
+   if(outgoing&&cut!==null){const duration=Math.min(s.transition_seconds,(cuts[cutIndex+1]-cut)*.8||s.transition_seconds);ctx.globalAlpha=Math.max(0,1-(t-cut)/duration);ctx.drawImage(outgoing,0,0);ctx.globalAlpha=1;}
+   previous=frame;
   }
   const refresh=()=>{last=-1;draw();};const tick=()=>{draw();frameId=v.requestVideoFrameCallback(tick);};
   v.addEventListener('seeked',refresh);v.addEventListener('loadeddata',refresh);v.addEventListener('timeupdate',draw);
