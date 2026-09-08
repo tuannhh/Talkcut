@@ -123,10 +123,10 @@ def transcribe(path):
             pass
 
 
-def tts(text, voice, target):
+def tts(text, voice, target, direction=None):
     # generateContent is also used by the reference project's working TTS adapter.
     result = request(f'{BASE}/models/{config.TTS_MODEL}:generateContent', {
-        'contents': [{'parts': [{'text': 'Đọc nguyên văn nội dung sau bằng tiếng Việt, giọng tự nhiên, rõ ràng, chuyên nghiệp. Không thêm lời dẫn:\n' + text}]}],
+        'contents': [{'parts': [{'text': (direction or 'Đọc nguyên văn nội dung sau bằng tiếng Việt, giọng tự nhiên, rõ ràng, chuyên nghiệp. Không thêm lời dẫn:\n') + text}]}],
         'generationConfig': {'responseModalities': ['AUDIO'], 'speechConfig': {'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': voice}}}},
     })
     parts = result.get('candidates', [{}])[0].get('content', {}).get('parts', [])

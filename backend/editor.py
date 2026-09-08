@@ -108,7 +108,10 @@ def fit_intro_regions(settings, title, exclusions):
     return changes
 
 
-def intro_card(settings, target, progress, title=''):
+def intro_card(settings, target, progress, title='', clip=None):
+    if settings.get('intro_design') == 'photo' and clip:
+        from .intro_art import photo_card
+        return photo_card(settings, target, title, clip)
     """Two independently styled layers. Exact user positions survive rendering."""
     bg = asset(settings['intro_asset'], 'image')
     im = ImageOps.fit(Image.open(bg).convert('RGB'), (W, H)).convert('RGBA') if bg else Image.new('RGBA', (W, H), '#19211b')
@@ -257,9 +260,12 @@ def crop_filter(info, settings, track=None):
     return portrait
 
 
-def still_segment(image, target, seconds, audio=None):
+def still_segment(image, target, seconds, audio=None, captions=None):
     args = ['-loop', '1', '-framerate', '30', '-i', image]
     args += ['-i', audio] if audio else ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo']
+    if captions:
+        escaped=str(captions).replace('\\','\\\\').replace(':','\\:').replace("'","'\\''")
+        args += ['-vf', f"ass='{escaped}'"]
     ffmpeg([*args, '-map', '0:v', '-map', '1:a', '-af', 'apad', '-t', str(seconds), *encode_args(), target])
 
 
@@ -298,18 +304,24 @@ def render(source, clip, words, settings, directory, progress):
         still_segment(directory / 'summary.png', directory / 'summary.mp4', settings['summary_seconds'])
         parts.append(directory / 'summary.mp4')
     if settings['intro_enabled']:
-        if not settings['intro_text'].strip():
-            raise ValueError('Intro cần nội dung chữ.')
-        intro_card(settings, directory / 'intro.png', progress, clip['title'])
+        if settings['intro_tts'] and not settings['intro_text'].strip():
+            raise ValueError('Hãy nhập lời mở đầu hoặc tắt đọc lời mở đầu.')
+        intro_card(settings, directory / 'intro.png', progress, clip['title'], clip)
         audio, seconds = None, settings['intro_seconds']
         if settings['intro_tts']:
             progress('Google TTS đang thu voice off', 23)
             from .narration import synthesize
-            audio, voice_plan = synthesize(settings['intro_text'], settings['intro_voice'], settings.get('intro_approval_id'))
+            audio, voice_plan = synthesize(settings['intro_text'], settings['intro_voice'], settings.get('intro_approval_id'), settings['intro_voice_mode'], settings['intro_voice_profile'])
             import json
             (directory / 'normalization.json').write_text(json.dumps(voice_plan, ensure_ascii=False))
             seconds = probe(audio)['duration'] + .35
-        still_segment(directory / 'intro.png', directory / 'intro.mp4', seconds, audio)
+        if audio and settings['intro_caption_enabled']:
+            from .narration import align_display
+            intro_words = align_display(audio, settings['intro_text'])
+            make_ass(intro_words, {'start':0,'end':seconds}, {**settings,'caption_y':settings['intro_caption_y']}, directory/'intro.ass')
+            still_segment(directory/'intro.png', directory/'intro.mp4', seconds, audio, directory/'intro.ass')
+        else:
+            still_segment(directory / 'intro.png', directory / 'intro.mp4', seconds, audio)
         parts.append(directory / 'intro.mp4')
     info = probe(source)
     track = focus_track(source, clip, directory, progress, words) if settings['crop_mode'] == 'auto' and (info['width'] / info['height'] > .57 or settings.get('crop_zoom', 1) > 1) else None

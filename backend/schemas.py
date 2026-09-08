@@ -15,10 +15,41 @@ class Word(BaseModel):
         return self
 
 
+class VoiceProfile(BaseModel):
+    age: Literal['thanhnien', 'trungnien', 'nguoidilam'] = 'nguoidilam'
+    gender: Literal['male', 'female'] = 'female'
+    region: Literal['bac', 'trung', 'nam'] = 'bac'
+    style: Literal['tintuc', 'thoisu', 'tvc'] = 'tintuc'
+    mood: Literal['neutral', 'cheerful', 'energetic'] = 'neutral'
+    speed: Literal[1, 1.2] = 1
+
+
 class Settings(BaseModel):
-    summary_enabled: bool = True
+    @model_validator(mode='before')
+    @classmethod
+    def migrate_removed_summary(cls, value):
+        if isinstance(value, dict):
+            value={**value, 'summary_enabled':False}
+        return value
+
+    summary_enabled: bool = False
     summary_seconds: float = Field(default=3, ge=1, le=10)
     intro_enabled: bool = False
+    intro_design: Literal['legacy', 'photo'] = 'photo'
+    intro_caption_enabled: bool = True
+    intro_caption_y: float = Field(default=.60, ge=.3, le=.83)
+    intro_title_text: str = Field(default='', max_length=180)
+    intro_title_highlight: str = Field(default='', max_length=100)
+    intro_title_highlight_color: str = Field(default='#ff7300', pattern=r'^#[0-9a-fA-F]{6}$')
+    intro_image_asset: str | None = None
+    intro_frame_time: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    intro_image_x: float = Field(default=.5, ge=0, le=1)
+    intro_image_y: float = Field(default=.5, ge=0, le=1)
+    intro_image_zoom: float = Field(default=1, ge=1, le=3)
+    intro_background_enabled: bool = False
+    intro_background_height: float = Field(default=.25, ge=.1, le=.6)
+    intro_voice_mode: Literal['prebuilt', 'designed'] = 'prebuilt'
+    intro_voice_profile: VoiceProfile = Field(default_factory=VoiceProfile)
     intro_text: str = Field(default='', max_length=700)
     intro_asset: str | None = None
     intro_color: str = Field(default='#ffffff', pattern=r'^#[0-9a-fA-F]{6}$')
@@ -55,7 +86,7 @@ class Settings(BaseModel):
     crop_mode: Literal['auto', 'center', 'manual', 'fit'] = 'auto'
     crop_x: float = Field(default=0.5, ge=0, le=1)
     crop_zoom: float = Field(default=1.0, ge=1, le=2)
-    brand_color: str = Field(default='#bcf34c', pattern=r'^#[0-9a-fA-F]{6}$')
+    brand_color: str = Field(default='#ff7300', pattern=r'^#[0-9a-fA-F]{6}$')
 
 
 class AnalyzeRequest(BaseModel):

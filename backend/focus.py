@@ -24,7 +24,13 @@ def cache_dir(source, clip):
 
 def cached(source, clip):
     path = cache_dir(source, clip) / 'focus.json'
-    return json.loads(path.read_text()) if path.exists() else None
+    if not path.exists(): return None
+    result=json.loads(path.read_text())
+    if result.get('layout_version')!='stable-v3':
+        enrich_reactions(path.parent,result)
+        import uuid
+        temp=path.with_name(uuid.uuid4().hex+'.tmp');temp.write_text(json.dumps(result,ensure_ascii=False));temp.replace(path)
+    return result
 
 
 def number(value, default=0):
@@ -203,9 +209,77 @@ Thời lượng file: '''+str(length)+' giây. Transcript tham chiếu: '+json.d
         for p in chunk['keyframes']:
             points.append({**p,'time':round(p['time']+start,3),'scene':f"{index}:{p['scene']}"})
     result={'version':VERSION,'start':clip['start'],'end':clip['end'],'keyframes':points,'scenes':scenes,'note':'Cảnh người nghe, cảnh trám và đoạn chưa chắc chắn giữ toàn khung; lời thoại tiếp tục nguyên vẹn.','method':'Gemini audio + lip/shot reasoning; OpenCV geometry; conservative fallback'}
+    enrich_reactions(directory,result)
     temp=directory/'focus.tmp';temp.write_text(json.dumps(result,ensure_ascii=False));temp.replace(directory/'focus.json')
     return result
 
 
+def enrich_reactions(directory, result):
+    """A listener is visual context, not a reassigned speaker. Keep portrait scale."""
+    import cv2
+    detector=cv2.CascadeClassifier(cv2.data.haarcascades+'haarcascade_frontalface_default.xml')
+    caps={}
+    try:
+        for p in result['keyframes']:
+            if p.get('kind')!='reaction':continue
+            index=int(p['time']//30);proxy=directory/f'shots-{index}.mp4'
+            if not proxy.exists():continue
+            cap=caps.setdefault(index,cv2.VideoCapture(str(proxy))) if index not in caps else caps[index]
+            cap.set(cv2.CAP_PROP_POS_MSEC,(p['time']-index*30)*1000)
+            ok,img=cap.read()
+            if not ok:continue
+            boxes=detector.detectMultiScale(cv2.cvtColor(img,cv2.COLOR_BGR2GRAY),scaleFactor=1.1,minNeighbors=5,minSize=(24,24))
+            if len(boxes)==1:
+                x,y,w,h=[float(v) for v in boxes[0]];ih,iw=img.shape[:2]
+                p.update(face=[x/iw,y/ih,(x+w)/iw,(y+h)/ih],x=(x+w/2)/iw,mode='crop',visual_context=True)
+    finally:
+        for cap in caps.values():cap.release()
+    result['layout_version']='stable-v3'
+    result['note']='Giữ bố cục ổn định trong từng cảnh; cảnh người nghe giữ lời thoại và chân dung khi thấy rõ. Cảnh chưa đủ hình ảnh giữ toàn khung.'
+
+
 def prepared_track(track, info, settings):
-    return {**track,'keyframes':[{**p,**geometry(info,settings,p)} for p in track['keyframes']]}
+    import statistics
+    points=[{**p,**geometry(info,settings,p)} for p in track['keyframes']]
+    # Lock a shot to one feasible crop center. Only move when the subject actually
+    # leaves that window; intersect face-safe bounds so smoothing never clips faces.
+    groups=[]
+    for p in points:
+        if not groups or groups[-1][-1].get('scene')!=p.get('scene'):groups.append([])
+        groups[-1].append(p)
+    for group in groups:
+        portraits=[p for p in group if p['mode']=='crop' and p.get('face')]
+        if not portraits:continue
+        # Single-frame detector misses in the same scene must not flash full frame.
+        for p in group:
+            if p['mode']=='fit' and p.get('kind') in ('speaker','reaction') and not p.get('face'):
+                q=min(portraits,key=lambda q:abs(q['time']-p['time']))
+                p.update({k:q[k] for k in ('x','y','cw','ch','mode','face')})
+        for axis,extent,full in [('x','cw',info['width']),('y','ch',info['height'])]:
+            center=statistics.median(p[axis] for p in portraits)
+            bounds=[]
+            for p in portraits:
+                x1,y1,x2,y2=p['face'];fw=x2-x1;fh=y2-y1;half=p[extent]/full/2
+                left,right=(max(0,x1-fw*.15),min(1,x2+fw*.15)) if axis=='x' else (max(0,y1-fh*.5),min(1,y2+fh*.3))
+                bounds.append((max(half,right-half),min(1-half,left+half)))
+            lo=max(b[0] for b in bounds);hi=min(b[1] for b in bounds)
+            if lo<=hi:
+                fixed=max(lo,min(hi,center))
+                for p in group:
+                    if p['mode']=='crop':p[axis]=fixed
+            else:
+                previous=portraits[0][axis]
+                for p in group:
+                    if p['mode']!='crop':continue
+                    target=p[axis]
+                    if abs(target-previous)<.018:target=previous
+                    else:target=previous+(target-previous)*.35
+                    # Original geometry already clamps face safety; clamp the
+                    # smoothing result again to this sample's face-safe interval.
+                    if p.get('face'):
+                        x1,y1,x2,y2=p['face'];fw=x2-x1;fh=y2-y1;half=p[extent]/full/2
+                        left,right=(max(0,x1-fw*.15),min(1,x2+fw*.15)) if axis=='x' else (max(0,y1-fh*.5),min(1,y2+fh*.3))
+                        target=max(half,right-half,min(1-half,left+half,target))
+                    p[axis]=target;previous=target
+        for i,p in enumerate(group):p['cut']=i==0
+    return {**track,'keyframes':points,'prepared':True,'prepared_zoom':settings.get('crop_zoom',1)}

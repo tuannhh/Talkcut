@@ -177,7 +177,7 @@ def test_new_script_approval_survives_save_and_stale_approval_is_cleared():
 def test_intro_preview_uses_same_renderer_and_safe_bounds():
     client=TestClient(app)
     c=store.create('clip',{'source_id':'unused','start':0,'end':10})
-    body={'title':'Tiêu đề thử','summary':'','start':0,'end':10,'settings':Settings(intro_text='Một lời mở đầu '*35,intro_x=.9,intro_y=.8).model_dump()}
+    body={'title':'Tiêu đề thử','summary':'','start':0,'end':10,'settings':Settings(intro_design='legacy',intro_text='Một lời mở đầu '*35,intro_x=.9,intro_y=.8).model_dump()}
     response=client.post('/api/clips/'+c['id']+'/intro-preview',json=body)
     assert response.status_code==200
     result=response.json()

@@ -32,7 +32,7 @@ Key đặt trong `.env`, chỉ đọc ở backend. File này bị loại khỏi 
 1. **Thêm nguồn video** bằng upload, link YouTube hoặc đường dẫn file. Hỗ trợ nguồn ngang và dọc; thư viện giữ nhiều nguồn riêng biệt.
 2. **Tìm đoạn hay**: nhập chủ đề, thời lượng tối thiểu/tối đa. Có sẵn gợi ý quản trị, thuế, tài chính hoặc mọi nội dung nổi bật. AI phân tích toàn bộ lời thoại và đề xuất số clip tùy chất lượng nội dung.
 3. **Duyệt clip**: nghe đoạn gốc, xem lý do chọn và ghi chú ngữ cảnh. Điểm 0–100 là đánh giá biên tập, không phải cam kết hiệu quả lên kênh. Sửa đầu/cuối clip bằng giây. Khi đổi khoảng cắt, lời thoại trong khoảng mới được tải lại từ transcript nguồn.
-4. **Nội dung**: bật/tắt thẻ tóm tắt, sửa tóm tắt, thêm intro với background, nội dung chữ và giọng đọc, chọn outro tùy ý. AI tìm vùng chữ trong khoảng an toàn để tránh logo/khuôn mặt; màu chữ và lớp nền tăng độ tương phản.
+4. **Nội dung**: tạo intro từ khung đầu tiên, một trong ba ảnh gợi ý hoặc ảnh upload; crop/di chuyển/phóng ảnh, thêm dải nền thương hiệu phía trên nếu cần. Sửa hoặc nhờ AI gợi ý tiêu đề, đổi màu/highlight/cỡ/vị trí và viết hoa. Lời mở đầu được đọc bằng voice có sẵn hoặc giọng tạo theo tùy chọn; karaoke intro bật/tắt riêng. Chọn outro tùy ý. Không còn thẻ tóm tắt riêng hoặc đoạn lời dẫn tĩnh trên intro.
 5. **Phụ đề**: từng từ sáng theo mốc STT. Đổi màu, cỡ chữ, vị trí và số từ mỗi cụm. Sửa từ trực tiếp; giữ mốc phát âm. Bấm thời gian để nghe lại từ đó.
 6. **Thương hiệu**: tự động bám người nói, căn giữa, crop thủ công hoặc giữ toàn khung. Có phóng khung để căn lại nguồn dọc. Watermark chữ hoặc hình, kéo vị trí và chỉnh độ hiện/kích thước. Chọn nhạc nền; âm lượng tự giảm khi có lời nói. Có thể áp dụng watermark/phụ đề/nhạc/outro hiện tại cho các clip đã chọn.
 7. **Lưu**, rồi **Dựng Full HD** hoặc chọn nhiều clip và **Dựng đã chọn**. Mỗi tác vụ chụp lại cấu hình tại thời điểm bắt đầu; việc sửa tiếp không làm thay đổi bản đang dựng.
@@ -84,7 +84,7 @@ React + Vite → FastAPI → SQLite + hàng đợi nền
 
 - `backend/google_ai.py`: adapter Google REST, không ghi key vào log.
 - `backend/pipeline.py`: nhập nguồn, cache transcript, chọn clip, hàng đợi và retry.
-- `backend/editor.py`: thẻ tóm tắt, intro, tracking, crop, ASS từng từ, concat, watermark, ducking.
+- `backend/editor.py`: intro ảnh + TTS/karaoke, tracking, crop, ASS từng từ, concat, watermark, ducking.
 - `backend/app.py`: API, upload streaming, giới hạn đường dẫn, tài nguyên, bản xuất.
 - `frontend/src/`: giao diện studio responsive.
 - `tests/test_core.py`: các kiểm tra thời gian, crop, dữ liệu model, giới hạn đường dẫn và API.
@@ -124,11 +124,14 @@ Dự án `ai-motion-studio` được dùng để tham khảo cách cấu hình w
 ## Cập nhật 08/09/2026: người nói, lời thoại và intro
 
 - **AI theo chủ thể** chuẩn bị một bản theo dõi khi mở clip. Màn hình hiển thị tiến độ; trong lúc chờ giữ toàn khung. Sau khi xong, bản xem trước và bản xuất dùng chung vị trí crop và quy tắc chuyển cảnh. Lần sau dùng lại kết quả đã lưu; đổi mốc cắt cần chuẩn bị lại.
-- AI nghe audio, quan sát môi và chia cảnh thành: người nói, người nghe, cảnh trám, nghi quay nhầm, hình lỗi, chuyển cảnh, kết cảnh hoặc chưa chắc chắn. Bấm danh sách cảnh trong tab Thương hiệu để nghe/xem lại. Chỉ crop khi có bằng chứng người nói đang hiện diện; các cảnh còn lại giữ toàn hình trong khung dọc. Không tự bỏ audio hoặc cắt đoạn talk chỉ vì camera quay sang người khác.
+- AI nghe audio, quan sát môi và chia cảnh thành: người nói, người nghe, cảnh trám, nghi quay nhầm, hình lỗi, chuyển cảnh, kết cảnh hoặc chưa chắc chắn. Bấm danh sách cảnh trong tab Thương hiệu để nghe/xem lại. Crop người nói khi có bằng chứng; cảnh người nghe có một mặt rõ được giữ chân dung ổn định mà vẫn ghi nhãn người nghe. Cảnh trám/lỗi/không chắc chắn giữ toàn hình. Không tự bỏ audio hoặc cắt đoạn talk chỉ vì camera quay sang người khác.
 - Dò mặt chỉ tinh chỉnh vị trí hình học, không chọn danh tính người nói. Bbox khuôn mặt có khoảng chừa đầu/tóc; mặt không vừa khung sẽ chuyển sang giữ toàn hình. Mốc cut được tinh chỉnh theo proxy 6 fps; đây vẫn là phân tích AI cần duyệt, không phải bảo đảm phân loại đúng mọi cảnh quay.
 - **Lời thoại** mặc định hiển thị theo câu/cụm (ngắt theo dấu câu, khoảng nghỉ, người nói và giới hạn độ dài). Có chế độ theo khung phụ đề. Bấm câu/từ để tua; “Sửa chữ” mở các từ trong cùng câu và giữ timestamp gốc. Không tự ước lượng lại timestamp khi sửa chính tả.
-- **Intro** có hai lớp: lời mở đầu và tiêu đề clip. AI gợi ý lời dẫn khi bật intro còn trống; nút gợi ý cho phép viết lại. Mỗi lớp có màu, cỡ chữ, độ rộng, tọa độ và kéo thả. Tiêu đề có tùy chọn giữ nguyên hoặc viết hoa toàn bộ. Nút AI gợi ý vị trí/màu phân tích background đã crop dọc để tránh logo. Bản xem trước intro là ảnh tạo bởi cùng bộ dựng với bản xuất; chữ quá dài tự giảm cỡ để vừa vùng hiển thị. Kiểm tra bố cục nếu tự kéo hai lớp đè lên nhau.
-- **Google TTS** dùng giọng dựng sẵn. Có “Nghe mẫu giọng” với câu chào được yêu cầu và “Nghe lời mở đầu”; audio được lưu theo văn bản/giọng/model để dùng lại. Tiêu đề hiển thị không tự đọc thêm vào voice off.
+- **Intro mới**: một ảnh dọc, tiêu đề ngắn và karaoke tùy chọn; lời dẫn chỉ dùng để đọc. Khung đầu tiên và hai mốc khác trong clip được trích bằng FFmpeg, không tạo ảnh giả. Ảnh nền thương hiệu có thể bật thành dải riêng phía trên. Preview PNG dùng cùng bộ dựng với MP4.
+- **Giọng đọc**: “Sử dụng voice có sẵn của Google” hoặc “Tạo sinh giọng đọc theo tùy chọn”. Chọn tuổi, giới tính, Bắc/Trung/Nam, tin tức/thời sự/TVC, tâm trạng và 1x/1,2x. Gemini dùng giọng nền với chỉ dẫn biểu cảm, không huấn luyện một danh tính giọng mới. Tốc độ 1,2x áp dụng bằng FFmpeg giữ cao độ. Có nghe mẫu và nghe lời mở đầu.
+- **Karaoke intro**: căn token hiển thị với audio thật sau đổi tốc độ, giữ nguyên chữ gốc khi bản đọc mở rộng số/từ viết tắt. Nếu mốc không hợp lệ, thử lại một lần; lỗi tiếp sẽ dừng và hướng dẫn xử lý, không chia đều thời gian giả. Tắt phụ đề vẫn giữ voice.
+- **Crop ổn định**: khóa tâm crop trong từng cảnh khi vẫn chứa đủ mặt; dùng vùng chết/làm mượt có giới hạn an toàn nếu chủ thể di chuyển. Cảnh cắt thật giữ mốc cắt gốc.
+- **Giao diện**: Light mode/Dark mode lưu theo trình duyệt, màu nhấn #ff7300, đúng hai logo MISA kèm tagline người dùng cung cấp.
 
 ### Quy ước đọc riêng cho TTS
 
@@ -142,7 +145,7 @@ Cập nhật từ điển trong `backend/tts_normalizer/approved_pronunciations.
 
 ### Dữ liệu và tương thích
 
-Settings mới có giá trị mặc định khi đọc clip cũ. Giữ nguyên source, transcript, clip, watermark, nhạc, outro và bản xuất cũ. Cache focus đời cũ không dùng lẫn với thuật toán mới. Có bản sao SQLite trước nâng cấp ở `/data/pre-v2-backup.sqlite` trong volume Docker. Các bản xuất cũ không tự thay đổi; dựng lại để áp dụng các tính năng mới.
+Settings mới có giá trị mặc định khi đọc clip cũ. Giữ nguyên source, transcript, clip, watermark, nhạc, outro và bản xuất cũ. Cache phân tích raw `speaker-shots-v2.2` được dùng lại và bổ sung layout `stable-v3`; không cần gọi lại Google chỉ để làm mượt crop. Có bản sao SQLite trước nâng cấp ở `/data/pre-v2-backup.sqlite` trong volume Docker. Các bản xuất cũ không tự thay đổi; dựng lại để áp dụng các tính năng mới.
 
 Kiểm thử:
 
@@ -150,3 +153,9 @@ Kiểm thử:
 python -m pytest tests -q
 node --test frontend/src/studio-helpers.test.mjs
 ```
+
+## Chạy local hay máy chủ?
+
+Khuyến nghị hiện tại: Docker local cho cá nhân có source trên máy. VPS có SSD bền vững phù hợp khi cần chạy 24/7 hoặc dùng từ nhiều máy, sau khi thêm đăng nhập/HTTPS/backup. Cloud Run cần tách API và render worker, chuyển media sang object storage, DB và hàng đợi ra ngoài; không đưa nguyên SQLite + local volume + worker nền hiện tại lên service. Xem [kiến trúc và nguồn tham chiếu](memory-bank/architecture.md).
+
+[Memory bank](memory-bank/README.md) lưu quyết định và bằng chứng kiểm tra. Skill handoff đã có tại máy tác giả; gói `.handoff/` lưu intent để bàn giao, trạng thái duyệt ghi trong manifest.

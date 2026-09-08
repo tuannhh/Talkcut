@@ -10,6 +10,8 @@ import re
 import unicodedata
 from pathlib import Path
 from pydantic import BaseModel, Field
+from typing import Literal
+from ..schemas import VoiceProfile
 
 VERSION='talkcut-r4-1.0'
 DICTIONARY=json.loads((Path(__file__).parent/'approved_pronunciations.json').read_text())
@@ -25,6 +27,8 @@ class NormalizeRequest(BaseModel):
     overrides:dict[str,str]=Field(default_factory=dict,max_length=100)
 
 class VoicePreviewRequest(BaseModel):
+    mode: Literal['prebuilt', 'designed'] = 'prebuilt'
+    profile: VoiceProfile = Field(default_factory=VoiceProfile)
     voice:str=Field(default='Kore',pattern=r'^[A-Za-z]{2,30}$')
     text:str=Field(default='Chào mừng bạn đến với công cụ cắt video tự động bằng AI của MISA',min_length=1,max_length=2000)
     approval_id:str|None=None

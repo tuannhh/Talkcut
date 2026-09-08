@@ -63,6 +63,7 @@ def health():
 @app.get('/api/studio')
 def studio():
     result = {kind: store.listing(singular) for kind, singular in [('sources', 'source'), ('clips', 'clip'), ('jobs', 'job'), ('exports', 'export'), ('assets', 'asset')]}
+    result['assets'] = [a for a in result['assets'] if a.get('path')]
     # Poll only summaries, never entire transcripts and render snapshots.
     for source in result['sources']:
         source.pop('transcript', None)
@@ -157,7 +158,7 @@ def edit_clip(id: str, body: ClipEdit):
             if w['start'] < previous or w['end'] > source['duration']:
                 raise ValueError('Các từ phải theo thứ tự thời gian trong nguồn.')
             previous = w['start']
-    for field, kind in [('intro_asset', 'image'), ('outro_asset', 'video'), ('music_asset', 'audio'), ('watermark_asset', 'image')]:
+    for field, kind in [('intro_asset', 'image'), ('intro_image_asset', 'image'), ('outro_asset', 'video'), ('music_asset', 'audio'), ('watermark_asset', 'image')]:
         if payload['settings'][field]:
             from .editor import asset
             asset(payload['settings'][field], kind)
@@ -265,7 +266,7 @@ def approve_tts(body: ApprovalRequest):
 
 @app.post('/api/tts/preview')
 def preview_tts(body: VoicePreviewRequest):
-    path, plan = narration.synthesize(body.text, body.voice, body.approval_id)
+    path, plan = narration.synthesize(body.text, body.voice, body.approval_id, body.mode, body.profile.model_dump())
     return {'path': str(path.relative_to(config.DATA)), 'plan': plan}
 
 
@@ -274,7 +275,7 @@ def get_focus(id: str):
     clip = store.get(id, 'clip')
     source = store.get(clip['source_id'], 'source')
     plan = focusing.cached(config.DATA / source['path'], clip)
-    return {'plan': plan, 'labels': focusing.LABELS}
+    return {'plan': focusing.prepared_track(plan, source, Settings.model_validate(clip.get('settings',{})).model_dump()) if plan else None, 'labels': focusing.LABELS}
 
 
 @app.post('/api/clips/{id}/focus')
@@ -304,14 +305,14 @@ def intro_preview(id: str, body: ClipEdit):
     from .editor import intro_card
     import hashlib
     settings = body.settings.model_dump()
-    key = hashlib.sha256(json.dumps([settings, body.title], ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:32]
+    key = hashlib.sha256(json.dumps(['photo-v3', id, body.start, body.end, settings, body.title], ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:32]
     directory = config.DATA / 'jobs' / ('intro-' + key)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / 'intro.png'
     meta = directory / 'layout.json'
     if not meta.exists() or not path.exists():
         temporary = directory / (uuid.uuid4().hex + '.png')
-        layers = intro_card(settings, temporary, lambda *args: None, body.title)
+        layers = intro_card(settings, temporary, lambda *args: None, body.title, {**store.get(id,'clip'),**body.model_dump()})
         temporary.replace(path)
         meta_temp = directory / (uuid.uuid4().hex + '.json')
         meta_temp.write_text(json.dumps(layers))
@@ -341,6 +342,30 @@ def suggest_intro_layout(id: str, body: ClipEdit):
     changes = {**regions, **{k:result[k] for k in ('intro_color','intro_title_color') if k in result}}
     valid = Settings.model_validate({**settings, **changes}).model_dump()
     return {k:valid[k] for k in changes}
+
+
+@app.post('/api/clips/{id}/intro-frames')
+def intro_frames(id: str, body: ClipEdit, refresh: bool = False):
+    from .intro_art import suggestions
+    clip={**store.get(id,'clip'),**body.model_dump()}
+    return {'frames':suggestions(clip,refresh)}
+
+
+@app.post('/api/clips/{id}/intro-title')
+def intro_title(id: str, body: ClipEdit):
+    store.get(id,'clip')
+    result=google_ai.generate('Viết tiêu đề intro tiếng Việt ngắn tối đa 12 từ, đúng nội dung, không giật tít hoặc bịa số liệu. JSON {"title":"..."}. Tiêu đề clip: '+body.title+'\nTóm tắt: '+body.summary)
+    if not isinstance(result,dict) or not isinstance(result.get('title'),str):raise ValueError('AI chưa trả tiêu đề hợp lệ.')
+    return {'title':result['title'][:180]}
+
+
+@app.post('/api/clips/{id}/intro-audio')
+def intro_audio(id: str, body: ClipEdit):
+    store.get(id,'clip');s=body.settings.model_dump()
+    path,plan=narration.synthesize(s['intro_text'],s['intro_voice'],s.get('intro_approval_id'),s['intro_voice_mode'],s['intro_voice_profile'])
+    words=narration.align_display(path,s['intro_text']) if s['intro_caption_enabled'] else []
+    from .media import probe
+    return {'path':str(path.relative_to(config.DATA)),'words':words,'duration':probe(path)['duration']}
 
 
 static = config.ROOT / 'frontend' / 'dist'
