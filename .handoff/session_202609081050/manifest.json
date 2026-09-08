@@ -1,0 +1,162 @@
+{
+  "session": "202609081050",
+  "objective": "Photo intro thay thẻ tóm tắt/lời dẫn tĩnh; Google voice profile, karaoke thật, crop ổn định và Light/Dark MISA #ff7300.",
+  "base_commit": null,
+  "baseline_candidate": "74506572fce1a2ac26f1850273c3b3ec6c8beb05",
+  "base_status": "Unconfirmed: baseline tạo tại A trước v3; chưa biết môi trường B. Không khẳng định B có commit này.",
+  "head_commit": "8ffc0863e61de85bbf7b26f6e60d72e4f37db8e5",
+  "review_status": "draft_pending_user_review",
+  "files_changed": [
+    {
+      "file_path": "AGENTS.md",
+      "status": "added",
+      "summary": "Đọc memory bank; giữ secrets/media ngoài Git; preview/export thống nhất.",
+      "log_reference": "changes/AGENTS.md"
+    },
+    {
+      "file_path": "README.md",
+      "status": "modified",
+      "summary": "Hướng dẫn ảnh intro, karaoke tùy chọn, profile giọng và local/VPS/Cloud Run.",
+      "log_reference": "changes/README.md"
+    },
+    {
+      "file_path": "VALIDATION.md",
+      "status": "modified",
+      "summary": "Kết quả test, browser, crop diagnostic và MP4 mới; giới hạn được ghi riêng.",
+      "log_reference": "changes/VALIDATION.md"
+    },
+    {
+      "file_path": "backend/app.py",
+      "status": "modified",
+      "summary": "API ảnh gợi ý, tiêu đề, audio kèm mốc; trả focus prepared và kiểm tra asset ảnh.",
+      "log_reference": "changes/backend_app.md"
+    },
+    {
+      "file_path": "backend/editor.py",
+      "status": "modified",
+      "summary": "Photo renderer dùng chung preview/export; ASS theo audio; intro im lặng không bắt buộc lời dẫn.",
+      "log_reference": "changes/backend_editor.md"
+    },
+    {
+      "file_path": "backend/focus.py",
+      "status": "modified",
+      "summary": "Khóa tâm khả thi theo cảnh, smoothing có chặn an toàn; một mặt rõ trên reaction giữ chân dung nhưng không đổi nhãn speaker.",
+      "log_reference": "changes/backend_focus.md"
+    },
+    {
+      "file_path": "backend/google_ai.py",
+      "status": "modified",
+      "summary": "Nhận direction tùy chọn và truyền vào prompt tổng hợp.",
+      "log_reference": "changes/backend_google_ai.md"
+    },
+    {
+      "file_path": "backend/intro_art.py",
+      "status": "added",
+      "summary": "Trích ba ảnh thật; một canvas 9:16; band thương hiệu tùy chọn; title/highlight; khóa sinh ảnh và chỉ tạo asset sau khi ghi file.",
+      "log_reference": "changes/backend_intro_art.md"
+    },
+    {
+      "file_path": "backend/narration.py",
+      "status": "modified",
+      "summary": "Cache gồm profile; atempo 1.2; căn token gốc vào audio; kiểm tra mốc và retry một lần, không chia đều.",
+      "log_reference": "changes/backend_narration.md"
+    },
+    {
+      "file_path": "backend/schemas.py",
+      "status": "modified",
+      "summary": "Summary luôn tắt; profile literal; ảnh/tiêu đề/highlight/karaoke/tọa độ được validate.",
+      "log_reference": "changes/backend_schemas.md"
+    },
+    {
+      "file_path": "backend/tts_normalizer/__init__.py",
+      "status": "modified",
+      "summary": "Thêm mode và VoiceProfile; giữ nguyên quy ước chuẩn hóa hiện có.",
+      "log_reference": "changes/backend_tts_normalizer___init__.md"
+    },
+    {
+      "file_path": "backend/voice_profiles.py",
+      "status": "added",
+      "summary": "Một giọng thống nhất, thêm miền Trung; tốc độ thực áp dụng ngoài prompt.",
+      "log_reference": "changes/backend_voice_profiles.md"
+    },
+    {
+      "file_path": "frontend/public/brand/misa-dark.png",
+      "status": "added",
+      "summary": "Copy nguyên bản logo-misa-dark-mode@4x.png người dùng cung cấp.",
+      "log_reference": "changes/frontend_public_brand_misa-dark.md"
+    },
+    {
+      "file_path": "frontend/public/brand/misa-light.png",
+      "status": "added",
+      "summary": "Copy nguyên bản logo-misa-light-mode@4x.png người dùng cung cấp.",
+      "log_reference": "changes/frontend_public_brand_misa-light.md"
+    },
+    {
+      "file_path": "frontend/src/EditorExtras.jsx",
+      "status": "modified",
+      "summary": "Gửi profile; phát audio/timings; kéo ảnh/title; bỏ khối caption rỗng; bỏ response audio cũ.",
+      "log_reference": "changes/frontend_src_EditorExtras.md"
+    },
+    {
+      "file_path": "frontend/src/IntroEditor.jsx",
+      "status": "added",
+      "summary": "Component ảnh gợi ý/upload/pan, title editable/AI/highlight/case, voice profiles, karaoke toggle.",
+      "log_reference": "changes/frontend_src_IntroEditor.md"
+    },
+    {
+      "file_path": "frontend/src/main.jsx",
+      "status": "modified",
+      "summary": "Theme lưu localStorage; logo MISA theo theme; IntroEditor/Canvas; nhận geometry prepared.",
+      "log_reference": "changes/frontend_src_main.md"
+    },
+    {
+      "file_path": "frontend/src/styles.css",
+      "status": "modified",
+      "summary": "Thay màu nền/viền/chữ bằng token dùng chung; sửa màu alpha sang color-mix.",
+      "log_reference": "changes/frontend_src_styles.md"
+    },
+    {
+      "file_path": "frontend/src/theme.css",
+      "status": "added",
+      "summary": "Nền trung tính hai chế độ; accent #ff7300; logo/ảnh/profile controls và preview overlays.",
+      "log_reference": "changes/frontend_src_theme.md"
+    },
+    {
+      "file_path": "memory-bank/README.md",
+      "status": "added",
+      "summary": "Điểm vào active context, architecture, changelog và validation.",
+      "log_reference": "changes/memory-bank_README.md"
+    },
+    {
+      "file_path": "memory-bank/active-context.md",
+      "status": "added",
+      "summary": "Lưu quyết định, dữ liệu cần giữ, cache và giới hạn; baseline chưa xác nhận.",
+      "log_reference": "changes/memory-bank_active-context.md"
+    },
+    {
+      "file_path": "memory-bank/architecture.md",
+      "status": "added",
+      "summary": "Luồng photo/voice/focus, state local; điều kiện tách state/worker cho Cloud Run và nguồn chính thức.",
+      "log_reference": "changes/memory-bank_architecture.md"
+    },
+    {
+      "file_path": "memory-bank/changelog.md",
+      "status": "added",
+      "summary": "Yêu cầu đã xác nhận, hiện thực, test và diagnostic crop có giới hạn.",
+      "log_reference": "changes/memory-bank_changelog.md"
+    },
+    {
+      "file_path": "tests/test_editing_v2.py",
+      "status": "modified",
+      "summary": "Chỉ định intro_design legacy cho test cũ; test photo mới tách riêng.",
+      "log_reference": "changes/tests_test_editing_v2.md"
+    },
+    {
+      "file_path": "tests/test_intro_v3.py",
+      "status": "added",
+      "summary": "8 test về migration, profile, FFmpeg 1.2x/cache, alignment retry, crop an toàn, photo/highlight, cache clip và caption-off.",
+      "log_reference": "changes/tests_test_intro_v3.md"
+    }
+  ],
+  "missing_why": []
+}
