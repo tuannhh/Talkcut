@@ -1,6 +1,6 @@
 # Talkcut project context
 
-Read `memory-bank/README.md`, `memory-bank/active-context.md` and `memory-bank/architecture.md` before making changes. This is a personal Docker application; the user explicitly exempted MISA design-system/backend standards. MISA logos and #ff7300 are product branding requirements, not a request to import AMIS frameworks.
+Read `memory-bank/README.md`, `memory-bank/active-context.md` and `memory-bank/architecture.md` before making changes. This is a personal Docker application; the user explicitly exempted MISA design-system/backend standards. MISA logos are product branding requirements. Buttons use #0086ff backgrounds with #ffffff labels in both themes; other #ff7300 accents remain. These are requirements, not a request to import AMIS frameworks.
 
 Keep `.env`, source media, runtime database, render files and credentials outside Git. Public artwork in `frontend/public/brand` is the supplied MISA logo including tagline; do not recreate or recolor it.
 

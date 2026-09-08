@@ -46,3 +46,7 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
 - Added vertical positioning, exact interval persistence, same geometry in preview/export/freeze frames, and content-safe presets.
 - New clips default fixed; existing choices preserved. Loading clips no longer automatically queues AI tracking.
 - 126 Python/6 JS tests and real source/browser/Full-HD fixed-shot validation passed.
+
+### v0.7.1-rc.1 — 2026-09-08
+- Set action buttons and active button choices to #0086ff backgrounds with #ffffff labels in both themes; retain disabled opacity and hover feedback.
+- Validated Docker/Vite build and actual browser screenshots/computed styles in Light and Dark mode. No video/data logic changed.
