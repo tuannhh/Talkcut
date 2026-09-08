@@ -275,7 +275,19 @@ def get_focus(id: str):
     clip = store.get(id, 'clip')
     source = store.get(clip['source_id'], 'source')
     plan = focusing.cached(config.DATA / source['path'], clip)
-    return {'plan': focusing.prepared_track(plan, source, Settings.model_validate(clip.get('settings',{})).model_dump()) if plan else None, 'labels': focusing.LABELS}
+    if plan:
+        settings=Settings.model_validate(clip.get('settings',{})).model_dump()
+        plan=focusing.prepared_track(plan,source,settings)
+        plan['holds']=focusing.calm_holds(plan,{**settings,'calm_short_shots':True})
+        from .intro_art import freeze
+        directory=focusing.cache_dir(config.DATA/source['path'],clip)
+        for h in plan['holds']:
+            path=directory/f'hold-v4.2-{h["frame_time"]:.3f}-{settings["crop_zoom"]}.jpg'
+            if not path.exists():
+                temp=path.with_name(uuid.uuid4().hex+'.jpg')
+                freeze(config.DATA/source['path'],{**clip,'settings':settings},clip['start']+h['frame_time'],temp);temp.replace(path)
+            h['path']=str(path.relative_to(config.DATA))
+    return {'plan':plan,'labels':focusing.LABELS}
 
 
 @app.post('/api/clips/{id}/focus')
@@ -305,7 +317,7 @@ def intro_preview(id: str, body: ClipEdit):
     from .editor import intro_card
     import hashlib
     settings = body.settings.model_dump()
-    key = hashlib.sha256(json.dumps(['photo-v3', id, body.start, body.end, settings, body.title], ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:32]
+    key = hashlib.sha256(json.dumps(['photo-v4', id, body.start, body.end, settings, body.title], ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:32]
     directory = config.DATA / 'jobs' / ('intro-' + key)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / 'intro.png'

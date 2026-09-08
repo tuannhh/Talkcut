@@ -2,6 +2,7 @@
 
 - [Active context](active-context.md): accepted requirements, current state and next checks.
 - [Architecture](architecture.md): runtime, data flow and deployment decision.
+- [Releases](releases.md): stable/RC lifecycle and rollback.
 - [Changelog](changelog.md): concrete changes and evidence.
 - [Validation](../VALIDATION.md): real-media checks and test results.
 

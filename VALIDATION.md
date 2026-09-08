@@ -53,3 +53,14 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
 - Endpoint media trả HTTP 206, byte range 0–1023/129956642. Các source, clip và export cũ được giữ trong volume, SQLite có snapshot pre-v3-backup.sqlite.
 - Source scan trước publication không phát hiện key Google, token GitHub hoặc private key; `.env`, runtime DB và video/audio không tracked.
 - Giải mã toàn bộ MP4 cuối bằng FFmpeg `-v error -f null -` thành công, không báo lỗi.
+
+## Cập nhật v4 — 08/09/2026: intro đúng lớp, sửa lời thoại trực tiếp, giảm giật
+
+- 107 test Python và 5 test JavaScript đạt; Docker/Vite production build đạt. Có test FFmpeg thật về giữ hình, hòa trộn sau cut, giữ số frame/thời lượng và hiệu chỉnh mốc cut theo video gốc.
+- PNG intro từ MP4 thật tại giây 2: chân dung trên, artwork MISA News phủ phần dưới, logo đầy đủ, tiêu đề trắng/cam trực tiếp trên nền xanh không có hộp đen; karaoke ở trên logo. Vùng alpha trống trong PNG 4500×8000 được xử lý trước khi đặt artwork, tránh lỗi banner bị thu nhỏ ở đầu khung.
+- Nguồn 25 fps có cut thật tại 15,760 giây, trong khi proxy 6 fps cho mốc 15,833. Đã hiệu chỉnh theo frame gốc, bỏ các thay đổi crop do ranh giới phân tích. Video thử thật 8 giây xác nhận frame hòa trộn và frame sau cut giữ đúng chân dung, không lóe bàn/ghế trống.
+- Clip có 60 cut camera quan sát được; giữ hình cho một cảnh người nghe ngắn 94,04–95,44 giây, còn 59 điểm hòa trộn. Không tự xóa audio hoặc thay toàn bộ cảnh quay gốc. Ảnh main.mp4 tại 94,5 giây xác nhận giữ hình khách mời. Mức giảm chuyển cảnh phụ thuộc cảnh trám thực tế; chưa chứng minh trên kho video lớn.
+- Browser bản cuối: sửa cả câu `1` thành `một` rồi bấm Lưu trực tiếp; backend lưu đúng chữ và giữ mốc 1510,6–1510,9. Chuyển sang theo khung phụ đề, sửa lại `1` rồi Lưu trực tiếp; dữ liệu gốc được khôi phục. Không cần nút Sửa chữ hoặc mở từng từ.
+- Job `a6a26e1d73d54f758ae59b78081a9d49` hoàn tất 100%; export `8ef839c948664b1b8e40986c7e1a3d44`: 302,367 giây, 1080×1920, H.264 30 fps/AAC, 133.747.786 byte. Có intro voice/karaoke, talk 290,9 giây, outro, music/watermark. Bản sao ngoài Git: `../talkcut-v4-fullhd.mp4`.
+- Giải mã toàn bộ MP4 cuối thành công, không báo lỗi; endpoint tải trả HTTP 206, bytes 0–1023/133747786. Sau triển khai UI cuối còn đủ 2 nguồn, 7 clip, 6 bản xuất.
+- Đã chạy rollback về image build từ commit 200b2ef rồi trở lại bản phát triển, giữ database/media. Snapshot pre-v4-backup.sqlite và image v0.3.0-rc.1 là dự phòng có lỗi đã biết, không phải stable. Bản v4 là release candidate, chỉ chốt stable/handoff khi người dùng xác nhận dùng ổn.

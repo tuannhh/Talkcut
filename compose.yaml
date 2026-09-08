@@ -1,6 +1,7 @@
 name: talkcut-studio
 services:
   studio:
+    image: ${TALKCUT_IMAGE:-talkcut-studio-studio:latest}
     build: .
     init: true
     restart: unless-stopped

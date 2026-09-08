@@ -188,7 +188,7 @@ def make_ass(words, clip, settings, target):
             for word in group:
                 active = word['start'] <= (start + end) / 2 < word['end']
                 texts.append('{\\c&H' + (color if active else 'FFFFFF') + '&}' + ass_escape(word['text']))
-            body = '{\\an5\\pos(510,' + str(round(settings['caption_y'] * H)) + ')}' + ' '.join(texts)
+            body = '{\\an5\\pos(' + str(round(settings.get('caption_x',510/1080)*W)) + ',' + str(round(settings['caption_y'] * H)) + ')}' + ' '.join(texts)
             lines.append(f'Dialogue: 0,{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{body}')
     target.write_text('\n'.join(lines), encoding='utf-8')
 
@@ -318,7 +318,7 @@ def render(source, clip, words, settings, directory, progress):
         if audio and settings['intro_caption_enabled']:
             from .narration import align_display
             intro_words = align_display(audio, settings['intro_text'])
-            make_ass(intro_words, {'start':0,'end':seconds}, {**settings,'caption_y':settings['intro_caption_y']}, directory/'intro.ass')
+            make_ass(intro_words, {'start':0,'end':seconds}, {**settings,'caption_y':settings['intro_caption_y'],'caption_x':settings['intro_caption_x']}, directory/'intro.ass')
             still_segment(directory/'intro.png', directory/'intro.mp4', seconds, audio, directory/'intro.ass')
         else:
             still_segment(directory / 'intro.png', directory / 'intro.mp4', seconds, audio)
@@ -326,6 +326,9 @@ def render(source, clip, words, settings, directory, progress):
     info = probe(source)
     track = focus_track(source, clip, directory, progress, words) if settings['crop_mode'] == 'auto' and (info['width'] / info['height'] > .57 or settings.get('crop_zoom', 1) > 1) else None
     vf = crop_filter(info, settings, track)
+    from .transitions import transition_plan,visual_filters
+    pacing=transition_plan(track,info,settings)
+    vf += ','+visual_filters(pacing,settings.get('transition_seconds',.24))
     if settings['caption_enabled']:
         if not words:
             raise ValueError('Chưa có transcript. Phân tích nguồn trước hoặc tắt phụ đề.')

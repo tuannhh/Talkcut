@@ -4,9 +4,9 @@ FastAPI/Python, React/Vite, SQLite JSON records, a single in-process queue worke
 
 `schemas.Settings` supplies compatible defaults and removes the summary card even when old records request it. Voice profile is validated server-side. `voice_profiles.instruction` gives one-speaker directions; `narration.synthesize` caches by spoken text, voice/model/mode/profile. `align_display` aligns original display tokens to final audio, after atempo. Numeric expansions remain spoken-only. Display and approved TTS text remain separate.
 
-`focus.cached` enriches reaction shots using a single visible face when possible; it does not label that listener as the speaker. `prepared_track` locks each scene to a shared face-safe crop center where possible, otherwise applies deadband/smoothing and clamps safe bounds. API returns this prepared geometry, consumed by frontend and FFmpeg. Unknown/b-roll remains full-frame.
+`focus.cached` enriches reaction shots using a single visible face when possible; it does not label that listener as the speaker. `visual_layout` verifies proxy cut candidates against native source frames; `prepared_track` groups by those camera cuts and locks each shot to a shared face-safe crop center where possible, otherwise applies deadband/smoothing and clamps safe bounds. API returns this prepared geometry, consumed by frontend and FFmpeg. Unknown/b-roll remains full-frame.
 
-`intro_art` creates real freeze-frame assets and a single 9:16 photo canvas. Optional upper brand band, pan/zoom, separate title/highlight layer; narration is never a static paragraph. `intro-preview` returns server-rendered PNG matching export. `intro-audio` returns audio plus word timings for browser karaoke. Full export burns ASS timed events over the still segment. Caption visibility does not disable TTS.
+`intro_art` creates real freeze-frame assets and a single 9:16 photo canvas. Bottom brand artwork composited with alpha, pan/zoom, separate title/highlight layer; narration is never a static paragraph. `intro-preview` returns server-rendered PNG matching export. `intro-audio` returns audio plus word timings for browser karaoke. Full export burns ASS timed events over the still segment. Caption visibility does not disable TTS.
 
 ## Deployment decision
 
@@ -20,3 +20,11 @@ Sources verified 2026-09-08:
 - https://docs.cloud.google.com/run/docs/container-contract
 - https://docs.cloud.google.com/run/docs/configuring/task-timeout
 - https://ai.google.dev/gemini-api/docs/speech-generation
+
+## v4 visual pacing and releases
+
+`transitions.visual_filters` converts to 30 fps with upward timestamp rounding, optionally holds a brief listener insert using select + fps, and mixes a small frame window at camera cuts. A clean branch preserves PTS; tmix is buffered continuously and its overlay enabled only at transitions (tmix disabled output can use older timestamps). ASS is added afterward, so words stay crisp and audio remains unchanged. Native source FPS determines hold thumbnail time; taking the previous 30 fps frame from a 25 fps source could otherwise select the incoming listener by mistake.
+
+`MotionPreview` draws the same prepared crop and short holds into a canvas, mixing recent frames near the same cuts. Browser performance and display cadence can differ from the encoded file; the MP4 is acceptance evidence. `editTimedGroup` preserves measured intervals; it never divides a row duration into invented timings.
+
+`scripts/versions.py` manages local checkpoints and app-image rollback. `compose.yaml` accepts TALKCUT_IMAGE; `.active-image` keeps start.sh on a selected checkpoint. Development checkout stays intact during image rollback. `.releases` stores local image/commit/snapshot metadata and is ignored by Git. No automatic restoration of old SQLite over new edits. Before future breaking DB migrations, define an explicit restore/migration path.

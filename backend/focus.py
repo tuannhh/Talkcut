@@ -6,6 +6,8 @@ geometry only and never decides who is speaking.
 import hashlib
 import json
 import math
+import threading
+_layout_lock=threading.RLock()
 from pathlib import Path
 from . import config, google_ai
 from .media import ffmpeg
@@ -23,11 +25,16 @@ def cache_dir(source, clip):
 
 
 def cached(source, clip):
+    with _layout_lock:return _cached(source,clip)
+
+
+def _cached(source, clip):
     path = cache_dir(source, clip) / 'focus.json'
     if not path.exists(): return None
     result=json.loads(path.read_text())
-    if result.get('layout_version')!='stable-v3':
+    if result.get('layout_version')!='calm-v4.2':
         enrich_reactions(path.parent,result)
+        visual_layout(path.parent,result,source,clip)
         import uuid
         temp=path.with_name(uuid.uuid4().hex+'.tmp');temp.write_text(json.dumps(result,ensure_ascii=False));temp.replace(path)
     return result
@@ -210,6 +217,7 @@ Thời lượng file: '''+str(length)+' giây. Transcript tham chiếu: '+json.d
             points.append({**p,'time':round(p['time']+start,3),'scene':f"{index}:{p['scene']}"})
     result={'version':VERSION,'start':clip['start'],'end':clip['end'],'keyframes':points,'scenes':scenes,'note':'Cảnh người nghe, cảnh trám và đoạn chưa chắc chắn giữ toàn khung; lời thoại tiếp tục nguyên vẹn.','method':'Gemini audio + lip/shot reasoning; OpenCV geometry; conservative fallback'}
     enrich_reactions(directory,result)
+    visual_layout(directory,result,source,clip)
     temp=directory/'focus.tmp';temp.write_text(json.dumps(result,ensure_ascii=False));temp.replace(directory/'focus.json')
     return result
 
@@ -240,7 +248,7 @@ def enrich_reactions(directory, result):
 
 def prepared_track(track, info, settings):
     import statistics
-    points=[{**p,**geometry(info,settings,p)} for p in track['keyframes']]
+    points=[{**p,**geometry(info,settings,p)} for p in camera_points(track)]
     # Lock a shot to one feasible crop center. Only move when the subject actually
     # leaves that window; intersect face-safe bounds so smoothing never clips faces.
     groups=[]
@@ -250,6 +258,9 @@ def prepared_track(track, info, settings):
     for group in groups:
         portraits=[p for p in group if p['mode']=='crop' and p.get('face')]
         if not portraits:continue
+        if any(p['mode']=='fit' and p.get('face') for p in group):
+            for p in group:p.update(mode='fit',x=.5,y=.5)
+            continue
         # Single-frame detector misses in the same scene must not flash full frame.
         for p in group:
             if p['mode']=='fit' and p.get('kind') in ('speaker','reaction') and not p.get('face'):
@@ -282,4 +293,73 @@ def prepared_track(track, info, settings):
                         target=max(half,right-half,min(1-half,left+half,target))
                     p[axis]=target;previous=target
         for i,p in enumerate(group):p['cut']=i==0
-    return {**track,'keyframes':points,'prepared':True,'prepared_zoom':settings.get('crop_zoom',1)}
+    return {**track,'keyframes':points,'prepared':True,'prepared_zoom':settings.get('crop_zoom',1),'holds':calm_holds(track,settings)}
+
+
+def visual_layout(directory,result,source=None,clip=None):
+    """Camera cuts are observed independently of model/chunk boundaries."""
+    import cv2
+    import bisect
+    cuts=[];previous=None
+    proxies=sorted(directory.glob('shots-*.mp4'),key=lambda p:int(p.stem.split('-')[1]))
+    for proxy in proxies:
+        index=int(proxy.stem.split('-')[1]);cap=cv2.VideoCapture(str(proxy));fps=cap.get(cv2.CAP_PROP_FPS) or 6;frame=0
+        try:
+            while True:
+                ok,img=cap.read()
+                if not ok:break
+                tiny=cv2.resize(cv2.cvtColor(img,cv2.COLOR_BGR2GRAY),(64,36));t=index*30+frame/fps
+                if previous is not None and float(cv2.absdiff(tiny,previous).mean())>24 and (not cuts or t-cuts[-1]>.3):cuts.append(round(t,3))
+                previous=tiny;frame+=1
+        finally:cap.release()
+    if not proxies:return
+    if source and clip:
+        cap=cv2.VideoCapture(str(source));refined=[]
+        result['source_fps']=cap.get(cv2.CAP_PROP_FPS) or 30
+        try:
+            for cut in cuts:
+                cap.set(cv2.CAP_PROP_POS_MSEC,(clip['start']+max(0,cut-.32))*1000)
+                previous=None;best=(0,cut)
+                while True:
+                    ok,img=cap.read()
+                    if not ok:break
+                    t=cap.get(cv2.CAP_PROP_POS_MSEC)/1000-clip['start']
+                    if t>cut+.24:break
+                    tiny=cv2.resize(cv2.cvtColor(img,cv2.COLOR_BGR2GRAY),(64,36))
+                    delta=float(cv2.absdiff(tiny,previous).mean()) if previous is not None else 0
+                    if delta>best[0]:best=(delta,t)
+                    previous=tiny
+                refined.append(round(best[1] if best[0]>24 else cut,5))
+        finally:cap.release()
+        cuts=sorted(set(refined))
+    result['visual_cuts']=cuts
+    result['layout_version']='calm-v4.2'
+
+
+def camera_points(track):
+    import bisect
+    raw=sorted(track['keyframes'],key=lambda p:p['time'])
+    if 'visual_cuts' not in track:return [dict(p) for p in raw]
+    end=track['end']-track['start'];bounds=[0,*[t for t in track['visual_cuts'] if 0<t<end],end];result=[]
+    for i,(a,b) in enumerate(zip(bounds,bounds[1:])):
+        group=[dict(p) for p in raw if a<=p['time']<b]
+        if not group:continue
+        # Incoming geometry comes from inside the observed shot, never an old
+        # model anchor a few frames across the camera cut.
+        anchor=next((p for p in group if p['time']>=a+.18),group[-1])
+        result.append({**anchor,'time':a,'scene':f'camera:{i}','cut':True})
+        result.extend({**p,'scene':f'camera:{i}','cut':False} for p in group if p['time']>a+.18)
+    return result
+
+
+def calm_holds(track,settings):
+    if not settings.get('calm_short_shots',True):return []
+    scenes=track.get('scenes',[]);cuts=track.get('visual_cuts',[]);holds=[]
+    for i,s in enumerate(scenes):
+        if not 0<i<len(scenes)-1 or s['kind']!='reaction' or not .35<=s['end']-s['start']<=2:continue
+        if scenes[i-1]['kind']!='speaker' or scenes[i+1]['kind']!='speaker':continue
+        start=min(cuts,key=lambda t:abs(t-s['start'])) if cuts else s['start']
+        end=min(cuts,key=lambda t:abs(t-s['end'])) if cuts else s['end']
+        if abs(start-s['start'])>.35 or abs(end-s['end'])>.35 or not .35<=end-start<=2:continue
+        holds.append({'start':start,'end':end,'frame_time':round(max(0,start-1/track.get('source_fps',30)),5),'reason':'Giữ hình qua cảnh người nghe ngắn; lời thoại tiếp tục.'})
+    return holds

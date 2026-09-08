@@ -68,11 +68,17 @@ def photo_card(settings,target,title,clip):
         im=src.crop((left,top,left+cw,top+ch)).resize((W,H),Image.Resampling.LANCZOS).convert('RGBA')
     bg=asset(settings.get('intro_asset'),'image') if settings.get('intro_background_enabled') else None
     if bg:
-        h=int(H*settings['intro_background_height'])
         with Image.open(bg) as brand:
-            banner=ImageOps.contain(brand.convert('RGBA'),(W,h),Image.Resampling.LANCZOS)
-            im.paste(Image.new('RGBA',(W,h),'#101114'),(0,0))
-            im.alpha_composite(banner,((W-banner.width)//2,(h-banner.height)//2))
+            brand=brand.convert('RGBA')
+            # Uploaded templates may have a transparent upper half. Retain alpha,
+            # scale the visible artwork to canvas width and anchor it at the bottom.
+            bounds=brand.getchannel('A').getbbox()
+            if bounds:
+                brand=brand.crop(bounds)
+                width=round(W*settings.get('intro_background_scale',1))
+                h=round(brand.height*width/brand.width)
+                banner=brand.resize((width,h),Image.Resampling.LANCZOS)
+                im.alpha_composite(banner,((W-width)//2,H-h))
     title=(settings.get('intro_title_text') or title) if settings.get('intro_title_enabled') else ''
     if settings['intro_title_case']=='upper':title=title.upper()
     layouts=[]
@@ -85,8 +91,7 @@ def photo_card(settings,target,title,clip):
         f=font(size);lines=wrap(title,f,width-40);h=int(len(lines)*size*1.35+40)
         x=max(24,min(W-width-24,int(W*settings['intro_title_x']-width/2)))
         y=max(24,min(H-h-24,int(H*settings['intro_title_y']-h/2)))
-        shade=Image.new('RGBA',(W,H));d=ImageDraw.Draw(shade)
-        d.rounded_rectangle((x,y,x+width,y+h),radius=20,fill=(8,10,14,180));im=Image.alpha_composite(im,shade);d=ImageDraw.Draw(im)
+        d=ImageDraw.Draw(im)
         # Highlight exact whole words selected by the user, matching across wraps.
         highlight={w.casefold().strip('.,!?;:') for w in settings['intro_title_highlight'].split()}
         for row,line in enumerate(lines):

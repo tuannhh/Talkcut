@@ -5,7 +5,7 @@
   "baseline_candidate": "74506572fce1a2ac26f1850273c3b3ec6c8beb05",
   "base_status": "Unconfirmed: baseline tạo tại A trước v3; chưa biết môi trường B. Không khẳng định B có commit này.",
   "head_commit": "8ffc0863e61de85bbf7b26f6e60d72e4f37db8e5",
-  "review_status": "draft_pending_user_review",
+  "review_status": "historical_draft_not_a_stable_release",
   "files_changed": [
     {
       "file_path": "AGENTS.md",
@@ -158,5 +158,6 @@
       "log_reference": "changes/tests_test_intro_v3.md"
     }
   ],
-  "missing_why": []
+  "missing_why": [],
+  "clarification": "User clarified stable version checkpoints, not document approval after each edit. This v3 draft is retained as history; v3 has reported bugs and is not stable."
 }

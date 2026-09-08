@@ -11,3 +11,14 @@ User confirmed the new photo intro replaces both the summary card and long stati
 - 102 Python tests and 4 JavaScript tests passed. Docker/Vite production build passed. No credentials, runtime SQLite or video/audio assets in source publication.
 
 Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and runtime assets stay in the local Docker volume, not GitHub.
+
+
+# v4 RC — feedback corrections
+
+- User clarified stable-version handoff/rollback. Historical v3 handoff remains documentation, not acceptance. Added immutable local checkpoints, version tags, image rollback and development return scripts; actual rollback round trip preserved source/clip/export counts.
+- Corrected transparent MISA News template placement: original PNG is 4500×8000 with alpha bbox starting at y4499. Crop only invisible padding, fit visible artwork to full canvas width and anchor bottom. Preserve transparency over portrait. Removed title rectangle; caption x/y has wide safe range and drag support.
+- Transcript sentence/frame rows are directly editable textareas. LCS-based mapping keeps original timing anchors; inserted text shares a nearby anchor instead of fabricated proportional word timings. Browser verified edit in sentence mode, switch to frame mode, reverse edit and save; original wording restored after test.
+- Discovered proxy cut precision was insufficient: source 25 fps cut at relative 15.760 versus proxy label 15.833. Native source frame refinement fixes the brief wrong crop around camera edits. Group crop by observed camera shots, not each model semantic/chunk boundary. Layout calm-v4.2 includes source fps; first cuts 3.96,7.44,11.2,15.76,19.24,23.92,29.8,32.76.
+- Visual-only frame mix around cuts, optional 1.4-second reaction hold at 94.04–95.44 on the sample. Source-FPS-aware thumbnail uses preceding frame 94.00, not next incoming frame. Conversion to 30 fps rounds upward to avoid bringing incoming frames into the held interval early. Audio/ASS timing remains unchanged. 60 source cuts, 59 after optional hold; no claim of removing most original camera edits.
+- Actual Linux FFmpeg test kept 90 frames for a 3-second fixture, held red through a blue insert, showed red/green mixture at transition and clean green after it. Native-cut 8-second real-media proof checked incoming face and brief blend around 15.76, eliminating the empty crop seen in the first trial.
+- 107 Python tests and 5 JavaScript tests passed; production build passed. Full-media evidence appended to VALIDATION.md after render finishes.

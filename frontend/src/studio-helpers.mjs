@@ -23,3 +23,26 @@ export function focusAt(points,time){
  const jump=q.cut||p.scene!==q.scene||p.mode!==q.mode;
  return {...p,x:jump||Math.abs(q.x-p.x)>.18?p.x:p.x+(q.x-p.x)*f,y:jump||Math.abs(q.y-p.y)>.18?p.y:p.y+(q.y-p.y)*f};
 }
+
+// Preserve measured timing anchors. Added words share an existing spoken interval;
+// never distribute a sentence's duration into invented word timestamps.
+export function editTimedGroup(group,text){
+ const next=text.trim().split(/\s+/).filter(Boolean),old=group.flatMap((w,i)=>w.text.split(/\s+/).filter(Boolean).map(t=>({text:t,owner:i})));
+ if(!next.length)return [];
+ if(group.length===next.length)return group.map((w,i)=>({...w,text:next[i]}));
+ const dp=Array.from({length:old.length+1},()=>Array(next.length+1).fill(0));
+ for(let i=old.length-1;i>=0;i--)for(let j=next.length-1;j>=0;j--)dp[i][j]=old[i].text===next[j]?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+ const matches=[];let i=0,j=0;
+ while(i<old.length&&j<next.length){if(old[i].text===next[j]){matches.push([i,j]);i++;j++;}else if(dp[i+1][j]>=dp[i][j+1])i++;else j++;}
+ matches.push([old.length,next.length]);const buckets=group.map(()=>[]);let a=0,b=0;
+ for(const [oi,nj] of matches){
+  const owners=[...new Set(old.slice(a,oi).map(x=>x.owner))];
+  for(let k=b;k<nj;k++){const owner=owners.length?owners[Math.min(owners.length-1,Math.floor((k-b)*owners.length/(nj-b)))]:old[oi]?.owner??old.at(-1)?.owner??0;buckets[owner].push(next[k]);}
+  if(oi<old.length)buckets[old[oi].owner].push(next[nj]);a=oi+1;b=nj+1;
+ }
+ return group.flatMap((w,i)=>buckets[i].length?[{...w,text:buckets[i].join(' ')}]:[]);
+}
+export function replaceTimedGroup(words,group,text){
+ const first=words.indexOf(group[0]);if(first<0)return words;
+ return [...words.slice(0,first),...editTimedGroup(group,text),...words.slice(first+group.length)];
+}
