@@ -101,7 +101,7 @@ def geometry(info, settings, p):
         return {'mode':'fit', 'x':.5, 'y':.5, 'cw':cw, 'ch':ch}
     face = p.get('face')
     cx = p.get('x', .5)
-    cy = .5
+    cy = p.get('y',.5)
     if face:
         x1,y1,x2,y2 = face
         fw,fh = x2-x1,y2-y1
@@ -257,6 +257,9 @@ def enrich_reactions(directory, result):
 
 
 def prepared_track(track, info, settings):
+    if settings.get('crop_mode')=='manual':
+        from .static_framing import prepare
+        return prepare(track,info,settings)
     import statistics
     raw=camera_points(track)
     for p in raw:

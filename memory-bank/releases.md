@@ -25,3 +25,6 @@ Rollback đổi image đang chạy, giữ checkout phát triển và dữ liệu
 
 ### v0.6.0-rc.1 — focus / transparent Intro
 Candidate checkpoint with profile-face refinement, stable shot anchors, dirty-state focus fix, transparent PNG compositing and title formatting/drag controls. Mix accepted in v5 is preserved. Previous v0.5.0-rc.2 remains the rollback target; both use the same compatible data schema. See VALIDATION.md for actual-media evidence. Not marked stable until user acceptance.
+
+### v0.7.0-rc.1 — fixed subject selection
+Candidate introducing explicit stationary subject framing and separate moving-subject tracking. Retains v0.6.0-rc.1 as rollback checkpoint. Schema adds fields under existing manual mode; older images ignore per-interval locks, so use v7 when those locks are required. No destructive database migration. Await user acceptance before stable promotion.

@@ -228,7 +228,7 @@ def crop_filter(info, settings, track=None):
     ch = int(min(ih, iw * 16 / 9) / zoom) // 2 * 2
     center = settings['crop_x'] if settings['crop_mode'] == 'manual' else .5
     xexpr = str(max(0, min(iw-cw, iw*center-cw/2)))
-    yexpr = str((ih-ch)//2)
+    yexpr = str(max(0,min(ih-ch,ih*(settings.get('crop_y',.5) if settings['crop_mode']=='manual' else .5)-ch/2)))
     fit_intervals=[]
     if track:
         from .focus import prepared_track
@@ -325,6 +325,9 @@ def render(source, clip, words, settings, directory, progress):
         parts.append(directory / 'intro.mp4')
     info = probe(source)
     track = focus_track(source, clip, directory, progress, words) if settings['crop_mode'] == 'auto' and (info['width'] / info['height'] > .57 or settings.get('crop_zoom', 1) > 1) else None
+    if settings['crop_mode']=='manual':
+        from .static_framing import cached_track
+        track=cached_track(source,clip)
     vf = crop_filter(info, settings, track)
     from .transitions import transition_plan,visual_filters
     pacing=transition_plan(track,info,settings)

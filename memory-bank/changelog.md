@@ -39,3 +39,10 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
 - Keep PNG alpha over a freeze frame from the current clip, including artwork selected in the image slot.
 - Drag the title locally; add size/alignment/bold/italic/underline controls shared with export and presets.
 - Validation: 119 Python tests, 5 JavaScript tests, Docker/Vite build, actual browser edits/drag, 18s 1080×1920 H.264/AAC proof with full decode.
+
+### v0.7.0-rc.1 — 2026-09-08
+- Added user-directed fixed subject selection on the source frame, scoped to camera shot/custom interval/whole clip.
+- Fixed crop has no AI/face-driven motion; moving-subject tracking remains available separately.
+- Added vertical positioning, exact interval persistence, same geometry in preview/export/freeze frames, and content-safe presets.
+- New clips default fixed; existing choices preserved. Loading clips no longer automatically queues AI tracking.
+- 126 Python/6 JS tests and real source/browser/Full-HD fixed-shot validation passed.

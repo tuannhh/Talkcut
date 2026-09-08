@@ -87,3 +87,11 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
 - Clip2 stored PNG selection now reveals a frame from that clip. Browser verified left alignment, italic, underline and a 20px/−8px drag; live transform resets after server layer refresh. Test-only browser edits discarded.
 - Media proof: outputs/talkcut-v6-focus-preview.mp4 (outside repo), 18.000s, 1080×1920, 30fps, H.264/AAC, decoded without errors. Intro proof: outputs/talkcut-v6-intro.png. This revision did not replace prior full exports.
 - SQLite snapshot /data/pre-v6-backup.sqlite taken before changes. Existing sources, clips, exports and preset retained. Candidate release, awaiting whole-app acceptance.
+
+## v7 fixed subject — 2026-09-08
+- 126 Python and 6 JS tests: no face-driven movement in manual mode; exact absolute-time lock bounds/overlap precedence; trimming retains source locations; presets exclude locks/coordinates; API save/reload/draft preview geometry equivalence.
+- Browser: selected VnExpress clip1, sought +168.75s, clicked right speaker on the original 16:9 frame, applied current-shot lock (1677.88–1682.12s absolute). Preview showed that subject, and the interval appeared in the inspector. Test draft was not written over user settings.
+- Full-HD proof ../talkcut-v7-locked-subject.mp4 uses x=.81 for the full 167.60–171.84s relative shot, with no dynamic crop expression. H.264/AAC 1080×1920/30fps; full decode succeeded.
+- Snapshot /data/pre-v7-backup.sqlite before runtime change. User dataset: 3 sources, 9 clips, 7 exports, 1 preset. Original files/exports retained.
+- A prior auto clip triggered one analysis during initial QA; loading no longer auto-queues analysis in the final implementation. Cached analysis remains available.
+- Camera-shot scope uses existing detected cuts; otherwise use the explicit custom interval/whole-clip options. No promise to remove camera motion already present in source footage.

@@ -323,6 +323,28 @@ def get_focus(id: str, zoom: float | None = Query(None, ge=1, le=2)):
     return {'plan':plan,'preview_plan':preview_plan,'labels':focusing.LABELS}
 
 
+@app.post('/api/clips/{id}/static-framing')
+def static_framing(id: str, body: ClipEdit):
+    from .static_framing import cached_track
+    from .intro_art import freeze
+    import hashlib
+    saved=store.get(id,'clip');clip={**saved,**body.model_dump()}
+    source=store.get(clip['source_id'],'source');settings=clip['settings']
+    if clip['end']>source['duration']:raise ValueError('Mốc kết thúc vượt quá thời lượng nguồn.')
+    settings['crop_mode']='manual'
+    track=cached_track(config.DATA/source['path'],clip)
+    plan=focusing.prepared_track(track,source,settings)
+    token=hashlib.sha256(json.dumps([id,clip['start'],clip['end'],settings],sort_keys=True).encode()).hexdigest()[:24]
+    directory=config.DATA/'jobs'/('static-'+token);directory.mkdir(parents=True,exist_ok=True)
+    for h in plan['holds']:
+        path=directory/f'hold-{h["frame_time"]:.5f}.jpg'
+        if not path.exists():
+            temp=directory/(uuid.uuid4().hex+'.jpg')
+            freeze(config.DATA/source['path'],clip,clip['start']+h['frame_time'],temp);temp.replace(path)
+        h['path']=str(path.relative_to(config.DATA))
+    return {'plan':plan}
+
+
 @app.post('/api/clips/{id}/focus')
 def prepare_focus(id: str):
     clip = store.get(id, 'clip')

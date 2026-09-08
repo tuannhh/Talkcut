@@ -24,6 +24,18 @@ class VoiceProfile(BaseModel):
     speed: Literal[1, 1.2] = 1
 
 
+class CropLock(BaseModel):
+    start: float = Field(ge=0, allow_inf_nan=False)
+    end: float = Field(gt=0, allow_inf_nan=False)
+    x: float = Field(ge=0, le=1, allow_inf_nan=False)
+    y: float = Field(default=.5, ge=0, le=1, allow_inf_nan=False)
+
+    @model_validator(mode='after')
+    def valid(self):
+        if self.end<=self.start:raise ValueError('Khoảng khóa phải có thời lượng dương.')
+        return self
+
+
 class Settings(BaseModel):
     @model_validator(mode='before')
     @classmethod
@@ -101,6 +113,8 @@ class Settings(BaseModel):
     caption_color: str = Field(default='#dfff00', pattern=r'^#[0-9a-fA-F]{6}$')
     caption_words: int = Field(default=5, ge=2, le=9)
     crop_mode: Literal['auto', 'center', 'manual', 'fit'] = 'auto'
+    crop_y: float = Field(default=.5, ge=0, le=1)
+    crop_locks: list[CropLock] = Field(default_factory=list, max_length=300)
     crop_x: float = Field(default=0.5, ge=0, le=1)
     crop_zoom: float = Field(default=1.0, ge=1, le=2)
     brand_color: str = Field(default='#ff7300', pattern=r'^#[0-9a-fA-F]{6}$')

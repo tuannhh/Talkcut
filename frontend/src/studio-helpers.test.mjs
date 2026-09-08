@@ -16,3 +16,12 @@ test('direct sentence editing preserves anchors through replacement insertion de
  assert.deepEqual(editTimedGroup(w,''),[]);
  assert.equal(replaceTimedGroup(w,w.slice(1,3),'là công dân').map(x=>x.text).join(' '),'Tôi là công dân Việt');
 });
+
+test('fixed subject uses explicit source-time positions without interpolation',async()=>{
+ const {staticCenter}=await import('./studio-helpers.mjs');
+ const s={crop_x:.2,crop_y:.5,crop_locks:[{start:105,end:115,x:.8,y:.3}]};
+ assert.deepEqual(staticCenter(s,104.99),{x:.2,y:.5});
+ assert.deepEqual(staticCenter(s,105),{x:.8,y:.3});
+ assert.deepEqual(staticCenter(s,114.99),{x:.8,y:.3});
+ assert.deepEqual(staticCenter(s,115),{x:.2,y:.5});
+});

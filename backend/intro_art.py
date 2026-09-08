@@ -12,7 +12,11 @@ from .media import ffmpeg, probe
 
 
 def freeze(source, clip, seconds, target):
-    info=probe(source);plan=focus.cached(source,clip)
+    info=probe(source)
+    if clip['settings'].get('crop_mode')=='manual':
+        from .static_framing import cached_track
+        plan=cached_track(source,clip)
+    else:plan=focus.cached(source,clip)
     crop='scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920'
     if plan:
         points=focus.prepared_track(plan,info,clip['settings'])['keyframes']
@@ -30,7 +34,7 @@ def first_frame(clip):
 
 def _first_frame(clip):
     source=config.DATA/store.get(clip['source_id'],'source')['path']
-    key=hashlib.sha256(json.dumps([str(source),clip['start'],clip['end'],'photo-v6']).encode()).hexdigest()[:24]
+    key=hashlib.sha256(json.dumps([str(source),clip['start'],clip['end'],'photo-v7',clip['settings'].get('crop_mode'),clip['settings'].get('crop_x'),clip['settings'].get('crop_y'),clip['settings'].get('crop_zoom'),clip['settings'].get('crop_locks')]).encode()).hexdigest()[:24]
     directory=config.DATA/'jobs'/('intro-photo-'+key);directory.mkdir(exist_ok=True,parents=True)
     target=directory/'first.jpg'
     if not target.exists():

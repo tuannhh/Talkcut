@@ -7,7 +7,7 @@ def transition_plan(track,info,settings):
     if not track:return {'cuts':[],'holds':[]}
     prepared=prepared_track(track,info,settings)
     holds=prepared['holds']
-    cuts=track.get('visual_cuts')
+    cuts=prepared.get('visual_cuts')
     if cuts is None:
         points=prepared['keyframes'];cuts=[q['time'] for p,q in zip(points,points[1:]) if q.get('cut') or q.get('scene')!=p.get('scene')]
     # Holding a reaction removes its entrance cut; the return keeps a short mix.

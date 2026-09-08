@@ -9,7 +9,7 @@ export function focusGeometry(info,settings,p){
  const iw=info.width,ih=info.height,z=settings.crop_zoom||1;
  const cw=Math.max(2,Math.floor(Math.min(iw,ih*9/16)/z/2)*2),ch=Math.max(2,Math.floor(Math.min(ih,iw*16/9)/z/2)*2);
  if(settings.crop_mode==='fit')return {...p,mode:'fit',x:.5,y:.5,cw,ch};
- let cx=p.x??.5,cy=.5;
+ let cx=p.x??.5,cy=p.y??.5;
  if(p.face){const [x1,y1,x2,y2]=p.face,fw=x2-x1,fh=y2-y1;const left=Math.max(0,x1-fw*.15),right=Math.min(1,x2+fw*.15),top=Math.max(0,y1-fh*.5),bottom=Math.min(1,y2+fh*.3);
  if((right-left)*iw>cw||(bottom-top)*ih>ch)return {...p,mode:'crop',x:clamp((x1+x2)/2,cw/iw/2,1-cw/iw/2),y:clamp((y1+y2)/2,ch/ih/2,1-ch/ih/2),cw,ch};
  cx=clamp(cx,right-cw/iw/2,left+cw/iw/2);cy=clamp((y1+y2)/2+ch/ih*.17,bottom-ch/ih/2,top+ch/ih/2);}
@@ -45,4 +45,9 @@ export function editTimedGroup(group,text){
 export function replaceTimedGroup(words,group,text){
  const first=words.indexOf(group[0]);if(first<0)return words;
  return [...words.slice(0,first),...editTimedGroup(group,text),...words.slice(first+group.length)];
+}
+
+export function staticCenter(settings,time){
+ const lock=[...(settings.crop_locks||[])].reverse().find(r=>r.start<=time&&time<r.end);
+ return {x:lock?.x??settings.crop_x??.5,y:lock?.y??settings.crop_y??.5};
 }
