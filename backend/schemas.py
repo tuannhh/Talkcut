@@ -72,6 +72,10 @@ class Settings(BaseModel):
     intro_width: float = Field(default=.8, ge=.3, le=.9)
     intro_title_enabled: bool = True
     intro_title_color: str = Field(default='#ffffff', pattern=r'^#[0-9a-fA-F]{6}$')
+    intro_title_align: Literal['left', 'center', 'right', 'justify'] = 'center'
+    intro_title_bold: bool = True
+    intro_title_italic: bool = False
+    intro_title_underline: bool = False
     intro_title_size: int = Field(default=72, ge=28, le=110)
     intro_title_x: float = Field(default=.5, ge=.1, le=.9)
     intro_title_y: float = Field(default=.70, ge=.12, le=.83)

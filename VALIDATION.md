@@ -78,3 +78,12 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
 - Giải mã toàn bộ MP4 bằng FFmpeg không báo lỗi; tải HTTP 206 đúng bytes 0–1023/138678431. Clip 2 cũng kiểm tra hình học 507 mốc, không có box mặt đã nhận diện vượt vùng crop.
 - Kiểm tra tương thích rollback bổ sung: `mix_seconds` lưu giá trị mới tới 1,2 giây; `transition_seconds` giữ giới hạn của v4. Bộ test cuối: 114 Python + 5 JavaScript đạt. Việc tách trường lưu trữ không thay đổi hình/tiếng trong bản dựng đã kiểm tra.
 - Đã rollback thật sang image `v0.4.0-rc.1`: API mở cả 7 clip trả HTTP 200. Trở lại v5 giữ `mix_seconds=0.65`, đủ 2 nguồn, 7 clip, 7 bản xuất và 1 preset. Không restore DB cũ hoặc xóa dữ liệu mới.
+
+## v6 focus / Intro correction — 2026-09-08
+- 119 Python tests and 5 JS tests pass. New regressions cover tiny-face rejection, shot locking, native/model cut boundary contamination, transparent upload over actual frame and exact preview-layer reconstruction.
+- Supplied testframe.png is RGBA 4500×8000, upper pixel (255,255,255,0). Its alpha was lost only in the portrait-slot RGB conversion; the file itself is correct.
+- Clip1 camera shot 167.60–171.84s now uses constant normalized crop x≈0.812 across its prepared samples. Actual frame at +168s and browser at +168.75s show the right-hand speaking subject, not the table. Browser proof includes an unsaved cosmetic edit.
+- Camera cuts remain 60; accepted pacing remains 50 Mix events, 10 brief holds, 0.65s Mix. transitions.py unchanged.
+- Clip2 stored PNG selection now reveals a frame from that clip. Browser verified left alignment, italic, underline and a 20px/−8px drag; live transform resets after server layer refresh. Test-only browser edits discarded.
+- Media proof: outputs/talkcut-v6-focus-preview.mp4 (outside repo), 18.000s, 1080×1920, 30fps, H.264/AAC, decoded without errors. Intro proof: outputs/talkcut-v6-intro.png. This revision did not replace prior full exports.
+- SQLite snapshot /data/pre-v6-backup.sqlite taken before changes. Existing sources, clips, exports and preset retained. Candidate release, awaiting whole-app acceptance.

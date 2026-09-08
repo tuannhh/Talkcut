@@ -48,3 +48,12 @@ Final v5 render job 57daddb8270c43b59298bc288cdb7e80 completed as export 1d053b9
 
 Final candidate is v0.5.0-rc.2, with new mix_seconds storage preserving the older transition_seconds range so v4 rollback can read current records. v0.5.0-rc.1 is an internal pre-compatibility checkpoint. Final suite: 114 Python + 5 JS.
 Rollback to v0.4.0-rc.1 was exercised after normalization: all 7 clip GETs returned 200. Returned to v5 with mix .65 and all 2 sources / 7 clips / 7 exports / 1 preset intact. Data was not reverted.
+
+## v6 — focus and transparent Intro correction (2026-09-08)
+User accepted the v5 Mix transition. Preserve its timing/holds; only face geometry and editor bugs changed. Candidate v0.6.0-rc.1, not a stable handoff. Existing data and presets retained.
+
+Fixed cosmetic dirty-state cancellation of focus loading. Zoom requests receive prepared shot geometry. Local frontal + mirrored profile detection refines audio-aware speaker anchors, rejecting small false positives. Camera-point grouping excludes model anchors within 180 ms of either side of a native cut to prevent the next shot pulling the previous crop. Existing camera cuts/holds remain unchanged.
+
+Transparent PNG selected in the portrait-image slot now composites over the same clip's freeze frame (verified supplied testframe.png has alpha=0 at top). Generated stills from a different source/trim are not used as this clip's frame. Preview has separate base/title PNG layers; pointer movement transforms the title locally, persisting position on pointer-up. Added size, left/center/right/justify, bold/italic/underline; defaults remain compatible with older checkpoints and presets.
+
+Evidence: 119 Python + 5 JS tests, Docker build, browser dirty draft at clip1 02:48 focused on right speaker, clip2 transparency/toolbar/drag verified. Full-HD 18-second crop/Mix proof exported and decoded. No full five-minute v6 export was requested/created; earlier exports remain historical. Face tracking is still heuristic with audio-aware AI anchors, not guaranteed biometric speaker identification in every shot.

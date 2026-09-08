@@ -3,7 +3,7 @@ import shutil
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
@@ -299,8 +299,9 @@ def preview_tts(body: VoicePreviewRequest):
 
 
 @app.get('/api/clips/{id}/focus')
-def get_focus(id: str):
+def get_focus(id: str, zoom: float | None = Query(None, ge=1, le=2)):
     clip = store.get(id, 'clip')
+    if zoom is not None:clip={**clip,'settings':{**clip.get('settings',{}),'crop_zoom':zoom}}
     source = store.get(clip['source_id'], 'source')
     plan = focusing.cached(config.DATA / source['path'], clip)
     if plan:
@@ -310,7 +311,7 @@ def get_focus(id: str):
         from .intro_art import freeze
         directory=focusing.cache_dir(config.DATA/source['path'],clip)
         for h in plan['holds']:
-            path=directory/f'hold-v5-{h["frame_time"]:.3f}-{settings["crop_zoom"]}.jpg'
+            path=directory/f'hold-v6-{h["frame_time"]:.3f}-{settings["crop_zoom"]}.jpg'
             if not path.exists():
                 temp=path.with_name(uuid.uuid4().hex+'.jpg')
                 freeze(config.DATA/source['path'],{**clip,'settings':settings},clip['start']+h['frame_time'],temp);temp.replace(path)
@@ -349,7 +350,7 @@ def intro_preview(id: str, body: ClipEdit):
     from .editor import intro_card
     import hashlib
     settings = body.settings.model_dump()
-    key = hashlib.sha256(json.dumps(['photo-v4', id, body.start, body.end, settings, body.title], ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:32]
+    key = hashlib.sha256(json.dumps(['photo-v6', id, body.start, body.end, settings, body.title], ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:32]
     directory = config.DATA / 'jobs' / ('intro-' + key)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / 'intro.png'
@@ -358,10 +359,13 @@ def intro_preview(id: str, body: ClipEdit):
         temporary = directory / (uuid.uuid4().hex + '.png')
         layers = intro_card(settings, temporary, lambda *args: None, body.title, {**store.get(id,'clip'),**body.model_dump()})
         temporary.replace(path)
+        for suffix in ('base','title'):
+            layer_path=temporary.with_name(temporary.stem+'-'+suffix+'.png')
+            if layer_path.exists():layer_path.replace(directory/('intro-'+suffix+'.png'))
         meta_temp = directory / (uuid.uuid4().hex + '.json')
         meta_temp.write_text(json.dumps(layers))
         meta_temp.replace(meta)
-    return {'path': str(path.relative_to(config.DATA)), 'layers': json.loads(meta.read_text())}
+    return {'path': str(path.relative_to(config.DATA)), 'base_path': str((directory/'intro-base.png').relative_to(config.DATA)) if (directory/'intro-base.png').exists() else None, 'title_path': str((directory/'intro-title.png').relative_to(config.DATA)) if (directory/'intro-title.png').exists() else None, 'layers': json.loads(meta.read_text())}
 
 
 @app.post('/api/clips/{id}/intro-layout')

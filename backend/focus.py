@@ -32,9 +32,16 @@ def _cached(source, clip):
     path = cache_dir(source, clip) / 'focus.json'
     if not path.exists(): return None
     result=json.loads(path.read_text())
+    changed=False
     if result.get('layout_version')!='portrait-v5.1':
         enrich_reactions(path.parent,result)
         visual_layout(path.parent,result,source,clip)
+        changed=True
+    if result.get('geometry_version')!='face-v6':
+        from .face_tracking import refresh_geometry
+        refresh_geometry(path.parent,result)
+        changed=True
+    if changed:
         import uuid
         temp=path.with_name(uuid.uuid4().hex+'.tmp');temp.write_text(json.dumps(result,ensure_ascii=False));temp.replace(path)
     return result
@@ -218,6 +225,8 @@ Thời lượng file: '''+str(length)+' giây. Transcript tham chiếu: '+json.d
     result={'version':VERSION,'start':clip['start'],'end':clip['end'],'keyframes':points,'scenes':scenes,'note':'Cảnh người nghe, cảnh trám và đoạn chưa chắc chắn giữ toàn khung; lời thoại tiếp tục nguyên vẹn.','method':'Gemini audio + lip/shot reasoning; OpenCV geometry; conservative fallback'}
     enrich_reactions(directory,result)
     visual_layout(directory,result,source,clip)
+    from .face_tracking import refresh_geometry
+    refresh_geometry(directory,result)
     temp=directory/'focus.tmp';temp.write_text(json.dumps(result,ensure_ascii=False));temp.replace(directory/'focus.json')
     return result
 
@@ -364,9 +373,11 @@ def camera_points(track):
         if not group:continue
         # Incoming geometry comes from inside the observed shot, never an old
         # model anchor a few frames across the camera cut.
-        anchor=next((p for p in group if p['time']>=a+.18),group[-1])
+        interior=[p for p in group if a+.18<=p['time']<b-.18]
+        if interior:group=interior
+        anchor=group[0]
         result.append({**anchor,'time':a,'scene':f'camera:{i}','cut':True})
-        result.extend({**p,'scene':f'camera:{i}','cut':False} for p in group if p['time']>a+.18)
+        result.extend({**p,'scene':f'camera:{i}','cut':False} for p in group if p['time']>a)
     return result
 
 

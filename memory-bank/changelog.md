@@ -32,3 +32,10 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
 - Short same-voice angle inserts can hold the preceding image only inside one continuous measured voice turn. Reaction/transition inserts can hold up to user limit. On real clip 1: 60 native camera cuts, 10 holds, 50 visible Mix points; clip 3: 45 cuts, 4 holds. This is editing cadence, not a precision claim for speaker recognition.
 - Keep v0.4.0-rc.1 as rollback image/tag. v5 remains a candidate until the user accepts it. pre-v5-backup.sqlite created before changes.
 - RC.2 compatibility correction: store the longer Mix in `mix_seconds`, preserve the v4 field range for rollback. Added a compatibility regression test; 114 Python + 5 JS tests pass. The rendered Mix geometry/audio are unchanged by the storage-field split.
+
+### v0.6.0-rc.1 — 2026-09-08
+- Fix center crop during unsaved edits; add profile-face refinement and reject wrong-sized detections.
+- Remove cross-shot anchor contamination causing within-shot crop sway. Preserve accepted Mix.
+- Keep PNG alpha over a freeze frame from the current clip, including artwork selected in the image slot.
+- Drag the title locally; add size/alignment/bold/italic/underline controls shared with export and presets.
+- Validation: 119 Python tests, 5 JavaScript tests, Docker/Vite build, actual browser edits/drag, 18s 1080×1920 H.264/AAC proof with full decode.

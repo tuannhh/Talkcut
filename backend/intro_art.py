@@ -6,7 +6,7 @@ import uuid
 import threading
 _image_lock=threading.RLock()
 from pathlib import Path
-from PIL import Image, ImageOps, ImageDraw
+from PIL import Image, ImageOps, ImageDraw, ImageFont
 from . import config, store, focus
 from .media import ffmpeg, probe
 
@@ -30,7 +30,7 @@ def first_frame(clip):
 
 def _first_frame(clip):
     source=config.DATA/store.get(clip['source_id'],'source')['path']
-    key=hashlib.sha256(json.dumps([str(source),clip['start'],clip['end'],'photo-v5']).encode()).hexdigest()[:24]
+    key=hashlib.sha256(json.dumps([str(source),clip['start'],clip['end'],'photo-v6']).encode()).hexdigest()[:24]
     directory=config.DATA/'jobs'/('intro-photo-'+key);directory.mkdir(exist_ok=True,parents=True)
     target=directory/'first.jpg'
     if not target.exists():
@@ -60,12 +60,21 @@ def _suggestions(clip, refresh=False):
 
 def photo_card(settings,target,title,clip):
     from .editor import asset,font,wrap,W,H
-    path=asset(settings.get('intro_image_asset'),'image') or first_frame(clip)
-    with Image.open(path) as src:
-        src=src.convert('RGB');zoom=settings['intro_image_zoom']
-        cw=min(src.width,src.height*W/H)/zoom;ch=cw*H/W
-        left=(src.width-cw)*settings['intro_image_x'];top=(src.height-ch)*settings['intro_image_y']
-        im=src.crop((left,top,left+cw,top+ch)).resize((W,H),Image.Resampling.LANCZOS).convert('RGBA')
+    path=asset(settings.get('intro_image_asset'),'image')
+    if settings.get('intro_image_asset'):
+        record=store.get(settings['intro_image_asset'],'asset')
+        if record.get('source_time') is not None and (record.get('source_id')!=clip.get('source_id') or not clip['start']<=record['source_time']<clip['end']):path=None
+    # A transparent upload is artwork above a real frame, never an RGB portrait.
+    with Image.open(path or first_frame(clip)) as src:
+        transparent=src.mode in ('RGBA','LA','P') and src.convert('RGBA').getchannel('A').getextrema()[0]<255
+        overlay=src.convert('RGBA').copy() if transparent else None
+        photo=Image.open(first_frame(clip)).convert('RGBA') if transparent else src.convert('RGBA')
+    zoom=settings['intro_image_zoom']
+    cw=min(photo.width,photo.height*W/H)/zoom;ch=cw*H/W
+    left=(photo.width-cw)*settings['intro_image_x'];top=(photo.height-ch)*settings['intro_image_y']
+    im=photo.crop((left,top,left+cw,top+ch)).resize((W,H),Image.Resampling.LANCZOS)
+    if overlay is not None:
+        im.alpha_composite(ImageOps.fit(overlay,(W,H),method=Image.Resampling.LANCZOS))
     bg=asset(settings.get('intro_asset'),'image') if settings.get('intro_background_enabled') else None
     if bg:
         with Image.open(bg) as brand:
@@ -79,27 +88,46 @@ def photo_card(settings,target,title,clip):
                 h=round(brand.height*width/brand.width)
                 banner=brand.resize((width,h),Image.Resampling.LANCZOS)
                 im.alpha_composite(banner,((W-width)//2,H-h))
+    base_path=Path(target).with_name(Path(target).stem+'-base.png')
+    im.save(base_path)
+    ink=Image.new('RGBA',(W,H))
     title=(settings.get('intro_title_text') or title) if settings.get('intro_title_enabled') else ''
     if settings['intro_title_case']=='upper':title=title.upper()
     layouts=[]
+    def title_font(size):
+        bold=settings.get('intro_title_bold',True);italic=settings.get('intro_title_italic',False)
+        suffix='-BoldOblique' if bold and italic else '-Bold' if bold else '-Oblique' if italic else ''
+        path=Path('/usr/share/fonts/truetype/dejavu/DejaVuSans'+suffix+'.ttf')
+        if path.exists():return ImageFont.truetype(str(path),size)
+        mac='/System/Library/Fonts/Supplemental/Arial'+(' Bold Italic' if bold and italic else ' Bold' if bold else ' Italic' if italic else '')+'.ttf'
+        return ImageFont.truetype(mac,size) if Path(mac).exists() else font(size)
     if title.strip():
         width=int(W*settings['intro_title_width']);size=settings['intro_title_size']
         while size>28:
-            lines=wrap(title,font(size),width-40)
+            lines=wrap(title,title_font(size),width-40)
             if len(lines)*size*1.35+40<H*.3:break
             size-=2
-        f=font(size);lines=wrap(title,f,width-40);h=int(len(lines)*size*1.35+40)
+        f=title_font(size);lines=wrap(title,f,width-40);h=int(len(lines)*size*1.35+40)
         x=max(24,min(W-width-24,int(W*settings['intro_title_x']-width/2)))
         y=max(24,min(H-h-24,int(H*settings['intro_title_y']-h/2)))
-        d=ImageDraw.Draw(im)
+        d=ImageDraw.Draw(ink)
         # Highlight exact whole words selected by the user, matching across wraps.
         highlight={w.casefold().strip('.,!?;:') for w in settings['intro_title_highlight'].split()}
         for row,line in enumerate(lines):
-            xx=x+(width-f.getlength(line))/2
+            align=settings.get('intro_title_align','center')
+            available=width-40;line_width=f.getlength(line)
+            xx=x+20+(available-line_width if align=='right' else (available-line_width)/2 if align=='center' else 0)
+            extra=(available-line_width)/(len(line.split())-1) if align=='justify' and row<len(lines)-1 and len(line.split())>1 else 0
             for word in line.split():
                 color=settings['intro_title_highlight_color'] if word.casefold().strip('.,!?;:') in highlight else settings['intro_title_color']
                 d.text((xx,y+20+row*size*1.35),word,font=f,fill=color,stroke_width=1,stroke_fill='#101114')
-                xx+=f.getlength(word+' ')
+                if settings.get('intro_title_underline'):
+                    yy=y+20+row*size*1.35+f.getbbox(word)[3]+3
+                    d.line((xx,yy,xx+f.getlength(word),yy),fill=color,width=max(1,size//22))
+                xx+=f.getlength(word+' ')+extra
         layouts.append({'prefix':'intro_title','x':x/W,'y':y/H,'width':width/W,'height':h/H,'size':size})
+    ink_path=Path(target).with_name(Path(target).stem+'-title.png')
+    ink.save(ink_path)
+    im.alpha_composite(ink)
     im.convert('RGB').save(target)
     return layouts
