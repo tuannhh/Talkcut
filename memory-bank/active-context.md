@@ -67,3 +67,6 @@ Validated 126 Python + 6 JS tests, actual browser selection of the right speaker
 
 ## Button colors — 2026-09-08
 Latest user instruction replaces orange button fills with #0086ff and white #ffffff labels in Light and Dark mode. Action buttons, icon actions and active segmented choices share CSS button tokens; inactive choices, color swatches, video styling and MISA logos retain their semantics. Docker/Vite build and browser computed colors verified in both themes, including disabled actions. Patch candidate v0.7.1-rc.1; no stable acceptance implied.
+
+## Packaging direction accepted — 2026-09-09
+User explicitly chooses a single installer orchestrating Docker/prerequisites, then Gemini API key onboarding with Internet available. Finish and accept a stable app first; do not start packaging yet. Python/FFmpeg/Node remain inside a prebuilt image, not separate host installs. See distribution.md for install/reboot flow, Windows amd64 validation and provisional 16 GB minimum / 32 GB recommended system targets. These are engineering targets pending Windows benchmarks. No stable acceptance or runtime change in this documentation update.

@@ -50,3 +50,7 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
 ### v0.7.1-rc.1 — 2026-09-08
 - Set action buttons and active button choices to #0086ff backgrounds with #ffffff labels in both themes; retain disabled opacity and hover feedback.
 - Validated Docker/Vite build and actual browser screenshots/computed styles in Light and Dark mode. No video/data logic changed.
+
+### Distribution requirements — 2026-09-09 (documentation only)
+- Recorded user-selected all-in-one installer flow retaining Docker, first-run Gemini API key and Internet requirement.
+- Added provisional Windows minimum/recommended hardware and release validation gates. Packaging deferred until stable acceptance; no new runtime version.
