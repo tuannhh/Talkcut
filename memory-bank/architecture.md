@@ -51,5 +51,13 @@ Rollback compatibility: v5 persists new `mix_seconds` (0–1.2s), while the lega
 
 SubjectPicker shows the original source video with a 9:16 crop rectangle, coordinate sliders, frame-time scrubber and scope selection. Selecting a face does not claim biometric identification; it fixes the requested crop center. Underlying movement in source footage is retained. Crop positions and lock ranges are content-specific and excluded from channel presets.
 
+## v8 selected-subject tracking
+
+`TrackingSubjects` presents local face samples from the current clip. The selected sample is content-specific and is excluded from presets. `subject_tracking` divides the source into native camera shots, samples local faces, and uses bundled OpenCV SFace embeddings to compare each local face with the selected portrait. A shot is locked to one feasible crop center; there is no left-right camera drift while that person remains inside the face-safe region. Gemini is not trusted for face coordinates in this flow.
+
+The threshold deliberately abstains on profile, occlusion, or ambiguous two-person frames. `reference_holds` then replaces that visual interval with a verified portrait still while original audio and timed captions continue. Preview and FFmpeg export use the exact same holds and geometry. This is an appearance match scoped to the source video, not identity verification or active-speaker recognition.
+
+`get_focus` now returns immediately when no prepared plan exists, instead of doing a synchronous low-resolution whole-video scan. The editor presents an explicit preparation state. The title renderer bundles Google Sans, Open Sans, Barlow and Roboto; its font selection is rendered by the same Pillow code used by preview and export.
+
 ## Future distribution decision — 2026-09-09
 Retain Docker for the no-tech Windows installer. A bootstrapper installs/checks Docker and WSL, loads the prebuilt TalkCut Linux amd64 image, starts the service and opens first-run Gemini API key setup. Runtime dependencies stay inside the image. Build only after stable acceptance; see [distribution plan](distribution.md).

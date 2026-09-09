@@ -95,3 +95,9 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
 - Snapshot /data/pre-v7-backup.sqlite before runtime change. User dataset: 3 sources, 9 clips, 7 exports, 1 preset. Original files/exports retained.
 - A prior auto clip triggered one analysis during initial QA; loading no longer auto-queues analysis in the final implementation. Cached analysis remains available.
 - Camera-shot scope uses existing detected cuts; otherwise use the explicit custom interval/whole-clip options. No promise to remove camera motion already present in source footage.
+
+## v8 selected-face tracking — 2026-09-09
+- 150 Python and 6 JavaScript tests passed. Docker/Vite production build passed. Regression coverage includes invalid appearance matches, conservative missing-shot holds, cache isolation, title font loading, and an unprepared focus request that must not scan the full source synchronously.
+- The VnExpress regression clip `f179175fe81b47079707ce5af7cf3fed` was processed end-to-end with the selected portrait of the guest wearing glasses. It has 34 native camera shots; 17 ambiguous/profile shots were intentionally held instead of assigning the interviewer or the table to the guest.
+- A 30-second Full-HD H.264/AAC proof at `/data/jobs/v8-proof-v3/main.mp4` rendered with the same crop, hold and Mix filters as export. FFmpeg decoded the complete proof without errors. The extracted +9 second frame is the selected guest portrait during an ambiguous shot; it no longer cuts to the interviewer/table.
+- SFace remains an appearance comparator within the current source. It does not prove legal identity or detect the active speaker from audio. Long profile/occluded sections require review because the deliberately conservative fallback may hold a prior verified portrait.

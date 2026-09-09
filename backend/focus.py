@@ -14,12 +14,13 @@ from .media import ffmpeg
 
 VERSION = 'speaker-shots-v2.2'
 KINDS = {'speaker', 'reaction', 'broll', 'wrong_shot', 'broken', 'transition', 'end', 'uncertain'}
-LABELS = {'speaker': 'Người đang nói', 'reaction': 'Cảnh người nghe', 'broll': 'Cảnh trám', 'wrong_shot': 'Có thể quay nhầm', 'broken': 'Hình lỗi / mất nét', 'transition': 'Chuyển cảnh / lia máy', 'end': 'Kết cảnh', 'uncertain': 'Chưa đủ bằng chứng'}
+LABELS = {'selected':'Chủ thể đã chọn','speaker': 'Người đang nói', 'reaction': 'Cảnh người nghe', 'broll': 'Cảnh trám', 'wrong_shot': 'Có thể quay nhầm', 'broken': 'Hình lỗi / mất nét', 'transition': 'Chuyển cảnh / lia máy', 'end': 'Kết cảnh', 'uncertain': 'Chưa đủ bằng chứng'}
 
 
 def cache_dir(source, clip):
     stat = Path(source).stat()
     identity = [VERSION, str(source), stat.st_size, stat.st_mtime_ns, clip['start'], clip['end'], config.CONTENT_MODEL]
+    if clip.get('settings',{}).get('tracking_subject'):identity += ['reference-v3',clip['settings']['tracking_subject']]
     key = hashlib.sha256(json.dumps(identity).encode()).hexdigest()[:32]
     return config.DATA / 'jobs' / ('focus-' + key)
 
@@ -32,6 +33,7 @@ def _cached(source, clip):
     path = cache_dir(source, clip) / 'focus.json'
     if not path.exists(): return None
     result=json.loads(path.read_text())
+    if result.get('reference_tracking'):return result
     changed=False
     if result.get('layout_version')!='portrait-v5.1':
         enrich_reactions(path.parent,result)
@@ -186,6 +188,9 @@ def analyze(source, clip, progress, words=None):
     found=cached(source,clip)
     if found:
         return found
+    if clip.get('settings',{}).get('tracking_subject'):
+        from .subject_tracking import analyze as reference_analyze
+        return reference_analyze(source,clip,progress)
     duration=clip['end']-clip['start']
     scenes=[]
     # Small windows keep lip motion visible and make chunk retries reusable.
@@ -261,7 +266,7 @@ def prepared_track(track, info, settings):
         from .static_framing import prepare
         return prepare(track,info,settings)
     import statistics
-    raw=camera_points(track)
+    raw=[dict(p) for p in track['keyframes']] if track.get('reference_tracking') else camera_points(track)
     for p in raw:
         if not p.get('face'):
             nearby=[q for q in raw if q.get('scene')==p.get('scene') and q.get('face')]
@@ -385,6 +390,13 @@ def camera_points(track):
 
 
 def calm_holds(track,settings):
+    if track.get('reference_tracking'):
+        required=[dict(h) for h in track.get('reference_holds',[])]
+        # Keep the existing measured same-voice pacing without letting an
+        # optional hold sample a required replacement or overlap its recovery.
+        optional=calm_holds({**track,'reference_tracking':False},settings)
+        optional=[h for h in optional if not any(h['start']<r['end']+2 and h['end']>r['start']-2 for r in required)]
+        return sorted(required+optional,key=lambda h:h['start'])
     if not settings.get('calm_short_shots',True):return []
     scenes=track.get('scenes',[]);cuts=track.get('visual_cuts',[]);holds=[]
     limit=settings.get('calm_max_seconds',4)

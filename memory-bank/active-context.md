@@ -70,3 +70,9 @@ Latest user instruction replaces orange button fills with #0086ff and white #fff
 
 ## Packaging direction accepted — 2026-09-09
 User explicitly chooses a single installer orchestrating Docker/prerequisites, then Gemini API key onboarding with Internet available. Finish and accept a stable app first; do not start packaging yet. Python/FFmpeg/Node remain inside a prebuilt image, not separate host installs. See distribution.md for install/reboot flow, Windows amd64 validation and provisional 16 GB minimum / 32 GB recommended system targets. These are engineering targets pending Windows benchmarks. No stable acceptance or runtime change in this documentation update.
+
+## v8 — selected face tracking / title fonts — 2026-09-09
+
+The user reported that both auto-tracking and fixed screen coordinates fail across wide/close camera angles. v8 introduces choosing a face sample from the current clip, then compares only locally detected candidate faces against that selected portrait with bundled OpenCV SFace. This supersedes trusting Gemini bounding boxes, which were observed to drift to the interviewer in real two-person shots. Low-confidence or undetected profile/occluded shots deliberately become portrait holds marked for review; they must never default to the table or unrelated person. This is source-scoped appearance matching, not identity or active-speaker verification.
+
+The primary VnExpress regression clip `f179175fe81b47079707ce5af7cf3fed` (493.98–654.38) was re-analysed with the male glasses reference. It produced 34 camera shots, 17 conservative holds. The prior false female crop at +81s is now an uncertain hold. A 30-second Full-HD 9:16 proof was rendered, decoded without errors, and at +9s displays the selected male portrait through a missing/ambiguous angle. Full existing user data remains untouched. v0.8.0-rc.1 will remain an RC until the user confirms this behavior in the running editor.

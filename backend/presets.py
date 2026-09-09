@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from .schemas import Settings
 from . import store
 
-CONTENT = {'crop_locks','crop_x','crop_y','intro_text','intro_title_text','intro_title_highlight','intro_approval_id',
+CONTENT = {'tracking_subject','crop_locks','crop_x','crop_y','intro_text','intro_title_text','intro_title_highlight','intro_approval_id',
            'intro_image_asset','intro_frame_time','intro_image_x','intro_image_y','intro_image_zoom'}
 
 class PresetRequest(BaseModel):

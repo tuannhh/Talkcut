@@ -299,27 +299,35 @@ def preview_tts(body: VoicePreviewRequest):
 
 
 @app.get('/api/clips/{id}/focus')
-def get_focus(id: str, zoom: float | None = Query(None, ge=1, le=2)):
+def get_focus(id: str, zoom: float | None = Query(None, ge=1, le=2), subject: str | None = None):
     clip = store.get(id, 'clip')
+    # This query is the unsaved auto-tracking draft. Do not prepare it with
+    # the persisted manual coordinates from the previous editing mode.
+    if subject is not None:clip={**clip,'settings':{**clip.get('settings',{}),'tracking_subject':subject or None,'crop_mode':'auto'}}
+    if subject:
+        from .subject_tracking import reference
+        reference(config.DATA/store.get(clip['source_id'],'source')['path'],subject)
     if zoom is not None:clip={**clip,'settings':{**clip.get('settings',{}),'crop_zoom':zoom}}
     source = store.get(clip['source_id'], 'source')
     plan = focusing.cached(config.DATA / source['path'], clip)
     if plan:
         settings=Settings.model_validate(clip.get('settings',{})).model_dump()
         plan=focusing.prepared_track(plan,source,settings)
-        plan['holds']=focusing.calm_holds(plan,{**settings,'calm_short_shots':True})
+        plan['holds']=focusing.calm_holds(plan,settings)
         from .intro_art import freeze
         directory=focusing.cache_dir(config.DATA/source['path'],clip)
+        from .subject_tracking import hold_images
+        hold_images(config.DATA/source['path'],{**clip,'settings':settings},plan)
         for h in plan['holds']:
+            if h.get('path'):continue
             path=directory/f'hold-v6-{h["frame_time"]:.3f}-{settings["crop_zoom"]}.jpg'
             if not path.exists():
                 temp=path.with_name(uuid.uuid4().hex+'.jpg')
                 freeze(config.DATA/source['path'],{**clip,'settings':settings},clip['start']+h['frame_time'],temp);temp.replace(path)
             h['path']=str(path.relative_to(config.DATA))
     preview_plan=None
-    if not plan:
-        preview_source=config.DATA/source.get('preview_path',source['path'])
-        preview_plan=focusing.prepared_track(focusing.visual_preview(config.DATA/source['path'],clip,preview_source),source,Settings.model_validate(clip.get('settings',{})).model_dump())
+    # Never run hundreds of video seeks synchronously just to open a clip.
+    # A plan is prepared explicitly; an unprepared crop is not a verified preview.
     return {'plan':plan,'preview_plan':preview_plan,'labels':focusing.LABELS}
 
 
@@ -343,6 +351,13 @@ def static_framing(id: str, body: ClipEdit):
             freeze(config.DATA/source['path'],clip,clip['start']+h['frame_time'],temp);temp.replace(path)
         h['path']=str(path.relative_to(config.DATA))
     return {'plan':plan}
+
+
+@app.get('/api/clips/{id}/subjects')
+def subject_gallery(id: str, time: float | None = Query(None,ge=0)):
+    from .subject_tracking import candidates
+    clip=store.get(id,'clip');source=store.get(clip['source_id'],'source')
+    return {'items':candidates(config.DATA/source['path'],clip,time)}
 
 
 @app.post('/api/clips/{id}/focus')

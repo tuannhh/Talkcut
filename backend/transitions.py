@@ -18,10 +18,16 @@ def transition_plan(track,info,settings):
 def visual_filters(plan,seconds):
     from .editor import balanced_sum
     filters=['fps=30:round=up']
-    if plan['holds']:
+    replacement=[h for h in plan['holds'] if h.get('reference') and h.get('path')]
+    for i,h in enumerate(replacement):
+        from . import config
+        path=str(config.DATA/h['path']).replace('\\','\\\\').replace(':','\\:').replace("'","'\\''")
+        filters += [f"split[base{i}][unused{i}];[unused{i}]nullsink;movie='{path}',loop=loop=-1:size=1:start=0,setpts=N/30/TB[portrait{i}];[base{i}][portrait{i}]overlay=0:0:enable='gte(t,{h['start']})*lt(t,{h['end']})':shortest=1"]
+    ordinary=[h for h in plan['holds'] if not h.get('reference')]
+    if ordinary:
         # Drop only the visual frames in a brief insert; fps fills the hole with
         # the last retained image. Original PTS and audio are not shortened.
-        expr=balanced_sum([f'gte(t,{h["start"]})*lt(t,{h["end"]})' for h in plan['holds']])
+        expr=balanced_sum([f'gte(t,{h["start"]})*lt(t,{h["end"]})' for h in ordinary])
         filters += [f"select='not({expr})'",'fps=30:round=up']
     if seconds and plan['cuts']:
         windows=mix_windows(plan['cuts'],seconds)

@@ -51,6 +51,12 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
 - Set action buttons and active button choices to #0086ff backgrounds with #ffffff labels in both themes; retain disabled opacity and hover feedback.
 - Validated Docker/Vite build and actual browser screenshots/computed styles in Light and Dark mode. No video/data logic changed.
 
+### v0.8.0-rc.1 — 2026-09-09
+- Added selected-subject tracking: users choose a local face sample, then SFace compares that portrait with locally detected faces per native camera shot. Crop locks inside each shot instead of following detector jitter.
+- Removed the unsafe dependence on Gemini freehand face coordinates. Ambiguous, missing, profile or occluded shots retain a verified portrait still and are explicitly reviewable; original audio and karaoke timing continue.
+- Opening a clip no longer performs a synchronous visual scan before showing the editor. Added bundled Google Sans, Open Sans, Barlow and Roboto for rendered intro titles.
+- Regression validation: 150 Python tests and 6 JavaScript tests pass; Docker production build passes. The real 160.4-second VnExpress clip was re-analysed, and a 30-second Full-HD H.264/AAC proof decoded without errors. Its ambiguous +9s frame retains the selected male portrait rather than the interviewer/table.
+
 ### Distribution requirements — 2026-09-09 (documentation only)
 - Recorded user-selected all-in-one installer flow retaining Docker, first-run Gemini API key and Internet requirement.
 - Added provisional Windows minimum/recommended hardware and release validation gates. Packaging deferred until stable acceptance; no new runtime version.

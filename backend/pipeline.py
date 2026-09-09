@@ -194,7 +194,7 @@ TRANSCRIPT DỮ LIỆU:\n{json.dumps(excerpt,ensure_ascii=False)}'''
     clips = validate_candidates(proposals, words, source['duration'], params['min_seconds'], params['max_seconds'])
     batch = []
     for clip in clips:
-        item = store.create('clip', {**clip, 'source_id': source['id'], 'settings': Settings(crop_mode='manual',intro_text=str(clip.get('intro_text', ''))[:700]).model_dump(), 'status': 'draft', 'revision': 1})
+        item = store.create('clip', {**clip, 'source_id': source['id'], 'settings': Settings(crop_mode='auto',intro_text=str(clip.get('intro_text', ''))[:700]).model_dump(), 'status': 'draft', 'revision': 1})
         thumbnail = folder / f"clip-{item['id']}.jpg"
         frame(config.DATA / source['path'], thumbnail, clip['start'])
         store.update(item['id'], thumbnail=str(thumbnail.relative_to(config.DATA)))

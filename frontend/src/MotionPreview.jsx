@@ -6,8 +6,9 @@ export function MotionPreview({video,clip,plan,points,info,media}){
  useEffect(()=>{
   const v=video.current,out=canvas.current;if(!v||!out)return;
   const ctx=out.getContext('2d'),W=360,H=640;out.width=W;out.height=H;
+  const buffers=Array.from({length:3},()=>{const c=document.createElement('canvas');c.width=W;c.height=H;return c;});
   let previous=null,outgoing=null,activeCut=null;
-  const holds=s.calm_short_shots&&plan?.framing_mode===s.crop_mode?plan?.holds||[]:[],images=new Map();
+  const holds=(s.calm_short_shots||plan?.reference_tracking)&&plan?.framing_mode===s.crop_mode?plan?.holds||[]:[],images=new Map();
   for(const h of holds){const im=new Image();im.onload=()=>{last=-1;draw();};im.src=media(h.path);images.set(h.start,im);}
   let last=-1,frameId,disposed=false;
   const cuts=(plan?.visual_cuts||points.filter((p,i)=>i&&(p.cut||p.scene!==points[i-1].scene)).map(p=>p.time)).filter(t=>!holds.some(h=>t>=h.start&&t<h.end-.01));
@@ -17,8 +18,9 @@ export function MotionPreview({video,clip,plan,points,info,media}){
    if(index===last)return;
    if(last<0||index<last||index-last>10){previous=null;outgoing=null;activeCut=null;}
    last=index;
-   const frame=document.createElement('canvas');frame.width=W;frame.height=H;const c=frame.getContext('2d');c.fillStyle='#000';c.fillRect(0,0,W,H);
+   const frame=buffers.find(b=>b!==previous&&b!==outgoing);const c=frame.getContext('2d');c.fillStyle='#000';c.fillRect(0,0,W,H);
    const hold=holds.find(h=>t>=h.start&&t<h.end),im=hold&&images.get(hold.start);
+   if(hold&&!im?.naturalWidth){if(previous)ctx.drawImage(previous,0,0);else{ctx.fillStyle='#111';ctx.fillRect(0,0,W,H);}return;}
    if(im?.complete&&im.naturalWidth)c.drawImage(im,0,0,W,H);
    else{
     let p=s.crop_mode==='auto'?focusAt(points,t):{mode:s.crop_mode==='fit'?'fit':'crop',...(s.crop_mode==='manual'?staticCenter(s,clip.start+t):{x:.5,y:.5})};

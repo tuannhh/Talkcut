@@ -34,7 +34,7 @@ def first_frame(clip):
 
 def _first_frame(clip):
     source=config.DATA/store.get(clip['source_id'],'source')['path']
-    key=hashlib.sha256(json.dumps([str(source),clip['start'],clip['end'],'photo-v7',clip['settings'].get('crop_mode'),clip['settings'].get('crop_x'),clip['settings'].get('crop_y'),clip['settings'].get('crop_zoom'),clip['settings'].get('crop_locks')]).encode()).hexdigest()[:24]
+    key=hashlib.sha256(json.dumps([str(source),clip['start'],clip['end'],'photo-v7',clip['settings'].get('crop_mode'),clip['settings'].get('crop_x'),clip['settings'].get('crop_y'),clip['settings'].get('crop_zoom'),clip['settings'].get('crop_locks'),clip['settings'].get('tracking_subject')]).encode()).hexdigest()[:24]
     directory=config.DATA/'jobs'/('intro-photo-'+key);directory.mkdir(exist_ok=True,parents=True)
     target=directory/'first.jpg'
     if not target.exists():
@@ -99,12 +99,8 @@ def photo_card(settings,target,title,clip):
     if settings['intro_title_case']=='upper':title=title.upper()
     layouts=[]
     def title_font(size):
-        bold=settings.get('intro_title_bold',True);italic=settings.get('intro_title_italic',False)
-        suffix='-BoldOblique' if bold and italic else '-Bold' if bold else '-Oblique' if italic else ''
-        path=Path('/usr/share/fonts/truetype/dejavu/DejaVuSans'+suffix+'.ttf')
-        if path.exists():return ImageFont.truetype(str(path),size)
-        mac='/System/Library/Fonts/Supplemental/Arial'+(' Bold Italic' if bold and italic else ' Bold' if bold else ' Italic' if italic else '')+'.ttf'
-        return ImageFont.truetype(mac,size) if Path(mac).exists() else font(size)
+        from .title_fonts import title_font as load_font
+        return load_font(settings,size)
     if title.strip():
         width=int(W*settings['intro_title_width']);size=settings['intro_title_size']
         while size>28:

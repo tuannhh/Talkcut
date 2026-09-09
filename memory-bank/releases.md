@@ -28,3 +28,7 @@ Candidate checkpoint with profile-face refinement, stable shot anchors, dirty-st
 
 ### v0.7.0-rc.1 — fixed subject selection
 Candidate introducing explicit stationary subject framing and separate moving-subject tracking. Retains v0.6.0-rc.1 as rollback checkpoint. Schema adds fields under existing manual mode; older images ignore per-interval locks, so use v7 when those locks are required. No destructive database migration. Await user acceptance before stable promotion.
+
+### v0.8.0-rc.1 — selected face tracking
+
+Candidate adding source-scoped SFace appearance comparison, conservative verified portrait holds and bundled title fonts. Retains v0.7.1-rc.1 as rollback target. No SQLite migration; tracking reference tokens are content-specific and presets remain portable. Await user acceptance before stable promotion.
