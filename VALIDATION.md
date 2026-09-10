@@ -135,3 +135,13 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
 - Final checks: 152 Python tests passed, Vite production build passed, and the
   rebuilt Docker Studio service is healthy at `http://localhost:8092/`. This is
   a release candidate pending user review, not a stable handoff.
+
+## v0.9.0-rc.3 — focus reload regression — 2026-09-10
+
+- Reproduced the user-visible failure as `GET /api/clips/{id}/focus` returning
+  HTTP 500 after focus preparation; the server traceback identified the missing
+  ordinary reaction-hold `freeze` helper, rather than face detection.
+- Added a regression exercising an ordinary cached focus plan with a hold;
+  selected-reference plans continue to return zero holds.
+- Final checks: 153 Python tests pass and the Vite production build passes.
+  Docker health/API verification is recorded after the rebuild.

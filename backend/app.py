@@ -324,6 +324,10 @@ def get_focus(id: str, zoom: float | None = Query(None, ge=1, le=2), subject: st
         settings=Settings.model_validate(clip.get('settings',{})).model_dump()
         plan=focusing.prepared_track(plan,source,settings)
         plan['holds']=focusing.calm_holds(plan,settings)
+        # Ordinary non-reference pacing can still make a short reaction hold.
+        # Selected-subject tracking returns no holds, so it never reaches this
+        # path and never freezes a portrait over moving source footage.
+        from .intro_art import freeze
         directory=focusing.cache_dir(config.DATA/source['path'],clip)
         for h in plan['holds']:
             if h.get('path'):continue

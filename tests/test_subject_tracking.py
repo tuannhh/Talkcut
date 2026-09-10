@@ -83,6 +83,24 @@ def test_selected_draft_uses_auto_geometry_even_when_saved_manual(monkeypatch):
     assert c['settings']['crop_mode']=='manual'
 
 
+def test_focus_endpoint_keeps_ordinary_reaction_hold_support(tmp_path,monkeypatch):
+    """Removing reference stills must not break unrelated focus responses."""
+    import backend.app as api
+    source_file=tmp_path/'source.mp4';source_file.write_bytes(b'x')
+    clip={'id':'clip','source_id':'source','start':0,'end':2,'settings':Settings(crop_mode='auto').model_dump()}
+    source={'path':str(source_file), 'width':1920, 'height':1080}
+    track={'start':0,'end':2,'keyframes':[{'time':0,'x':.5,'mode':'crop','scene':'camera:0'}], 'visual_cuts':[], 'scenes':[]}
+    monkeypatch.setattr(api.store,'get',lambda id,*args: clip if id=='clip' else source)
+    monkeypatch.setattr(api.focusing,'cached',lambda *args: track)
+    monkeypatch.setattr(api.focusing,'prepared_track',lambda *args: {**track,'holds':[{'start':.5,'end':.8,'frame_time':.4}]})
+    monkeypatch.setattr(api.focusing,'calm_holds',lambda *args: [{'start':.5,'end':.8,'frame_time':.4}])
+    hold_dir=api.config.DATA/'ordinary-hold';hold_dir.mkdir(exist_ok=True)
+    monkeypatch.setattr(api.focusing,'cache_dir',lambda *args: hold_dir)
+    monkeypatch.setattr('backend.intro_art.freeze',lambda source,clip,seconds,target: target.write_bytes(b'jpg'))
+    result=api.get_focus('clip', None)
+    assert result['plan']['holds'][0]['path'].endswith('.jpg')
+
+
 def test_reference_tracking_never_inserts_a_static_visual_hold():
     from backend.focus import calm_holds
     track={'reference_tracking':True,'start':0,'end':12,'visual_cuts':[2,3,8,9],

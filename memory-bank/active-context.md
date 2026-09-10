@@ -115,3 +115,14 @@ The cache namespace is `reference-v5-dynamic`, so an old portrait-hold plan
 cannot be reused. The current test source is upgraded to 3840×2160 AV1 while
 the old 640×360 file remains in the Docker volume. Candidate `v0.9.0-rc.2`
 awaits user review and is not a stable handoff.
+
+## v9 RC.3 — reliable focus reload — 2026-09-10
+
+The selected-face finder itself completed successfully, but reloading the
+prepared focus plan could fail with HTTP 500 when an ordinary (non-reference)
+plan contained a short reaction hold. RC.2 had removed the image helper used
+only by that legacy path. RC.3 restores it while selected-subject plans still
+return no holds and therefore never replace moving footage with a JPEG. The
+browser now converts any unexpected non-JSON error response into a concise
+Vietnamese message instead of exposing a JSON parser exception. Candidate only;
+no stable acceptance or handoff yet.

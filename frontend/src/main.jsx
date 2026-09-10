@@ -16,7 +16,9 @@ const fmt = n => {n=Math.max(0,Number(n)||0);return `${Math.floor(n/60).toString
 const initial = {sources:[], clips:[], jobs:[], exports:[], assets:[]};
 async function api(path, options={}) {
   const r=await fetch('/api'+path, {...options, headers: options.body instanceof FormData ? {} : {'Content-Type':'application/json',...(options.headers||{})}});
-  const data=await r.json();
+  const raw=await r.text();
+  let data;
+  try{data=raw?JSON.parse(raw):{};}catch{throw new Error(r.ok?'Máy chủ trả phản hồi không hợp lệ. Hãy thử lại.':`Máy chủ gặp lỗi (${r.status}). Hãy thử lại sau.`);}
   if(!r.ok) throw new Error(typeof data.detail==='string'?data.detail:Array.isArray(data.detail)?data.detail.map(x=>x.msg).join('; '):'Không thực hiện được thao tác.');
   return data;
 }

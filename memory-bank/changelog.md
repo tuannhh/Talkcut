@@ -91,3 +91,12 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
 - 152 Python tests and the Vite production build passed. The supplied test
   source was refreshed from 640×360 to 3840×2160; a 15.034-second Full-HD
   proof has no reference/visual holds and decodes successfully.
+
+### v0.9.0-rc.3 — 2026-09-10
+
+- Fixed the focus reload HTTP 500 caused by removing the freeze helper for
+  ordinary reaction holds. Selected-subject tracking continues to produce no
+  still holds, so this does not reintroduce frozen reference portraits.
+- Hardened the browser API client against plain-text server errors, showing a
+  recoverable Vietnamese error instead of `Unexpected token ... valid JSON`.
+- Validation: 153 Python tests and Vite production build pass.

@@ -49,3 +49,10 @@ Candidate preserving `v0.9.0-rc.1` as the preceding rollback point. It prefers
 uncertain shots remain moving footage. Source replacement is additive: the
 old local file stays in the volume. No schema migration; await user review
 before stable promotion.
+
+### v0.9.0-rc.3 — reliable focus reload
+
+Candidate preserving v0.9.0-rc.2 as its rollback point. It restores the
+ordinary reaction-hold image helper that a previous cleanup removed, without
+changing selected-subject plans (which explicitly have no static holds).
+No SQLite migration; await user review before stable promotion.
