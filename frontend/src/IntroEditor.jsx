@@ -11,7 +11,8 @@ const profiles=[
  ['speed','Tốc độ đọc',[[1,'Bình thường · 1x'],[1.2,'Nhanh · 1,2x']]],
 ];
 export function IntroEditor({clip,setting,setPreview,suggestIntro,busy,assets,refresh,post,notify,media,Field,Slider,Toggle,AssetPicker,onUpload,onImageDrag}){
- const s=clip.settings,[frames,setFrames]=useState([]),[loading,setLoading]=useState('');
+ const s=clip.settings,[frames,setFrames]=useState([]),[loading,setLoading]=useState(''),[titleSize,setTitleSize]=useState(String(clip.settings.intro_title_size));
+ useEffect(()=>setTitleSize(String(clip.settings.intro_title_size)),[clip.id,clip.settings.intro_title_size]);
  const body=()=>({title:clip.title,summary:clip.summary,start:clip.start,end:clip.end,settings:s,words:[]});
  async function run(name,fn){setLoading(name);try{await fn();}catch(e){notify(e.message,true);}finally{setLoading('');}}
  async function thumbnails(regenerate=false){await run('frames',async()=>{const r=await post(`/clips/${clip.id}/intro-frames${regenerate?'?refresh=true':''}`,body());setFrames(r.frames);await refresh();});}
@@ -33,7 +34,7 @@ export function IntroEditor({clip,setting,setPreview,suggestIntro,busy,assets,re
   <div className="title-colors"><label>Màu chữ<input aria-label="Màu chữ tiêu đề" type="color" value={s.intro_title_color} onChange={e=>setting('intro_title_color',e.target.value)}/></label><label>Màu highlight<input aria-label="Màu highlight tiêu đề" type="color" value={s.intro_title_highlight_color} onChange={e=>setting('intro_title_highlight_color',e.target.value)}/></label></div>
   <div className="title-toolbar" role="toolbar" aria-label="Định dạng tiêu đề">
    <label>Font<select aria-label="Font tiêu đề" value={s.intro_title_font||'DejaVu Sans'} onChange={e=>setting('intro_title_font',e.target.value)}>{['DejaVu Sans','Google Sans','Open Sans','Barlow','Roboto'].map(f=><option key={f}>{f}</option>)}</select></label>
-   <label>Cỡ chữ<input aria-label="Cỡ chữ tiêu đề" type="number" min={28} max={110} value={s.intro_title_size} onChange={e=>{const v=Number(e.target.value);if(v>=28&&v<=110)setting('intro_title_size',v);}}/></label>
+   <label>Cỡ chữ<input aria-label="Cỡ chữ tiêu đề" type="number" inputMode="numeric" min={28} max={110} value={titleSize} onChange={e=>setTitleSize(e.target.value)} onBlur={()=>{const value=Number(titleSize);if(Number.isInteger(value)&&value>=28&&value<=110)setting('intro_title_size',value);else setTitleSize(String(s.intro_title_size));}} onKeyDown={e=>e.key==='Enter'&&e.currentTarget.blur()}/></label>
    <select aria-label="Căn lề tiêu đề" value={s.intro_title_align||'center'} onChange={e=>setting('intro_title_align',e.target.value)}>{[['left','Căn trái'],['center','Căn giữa'],['right','Căn phải'],['justify','Căn đều hai bên']].map(([v,label])=><option key={v} value={v}>{label}</option>)}</select>
    {[['bold','Đậm','B'],['italic','Nghiêng','I'],['underline','Gạch chân','U']].map(([key,label,text])=><button key={key} aria-label={label+' tiêu đề'} aria-pressed={!!s['intro_title_'+key]} className={s['intro_title_'+key]?'active':''} onClick={()=>setting('intro_title_'+key,!s['intro_title_'+key])} style={{fontWeight:key==='bold'?800:400,fontStyle:key==='italic'?'italic':'normal',textDecoration:key==='underline'?'underline':'none'}}>{text}</button>)}
   </div>

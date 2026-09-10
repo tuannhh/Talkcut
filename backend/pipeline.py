@@ -253,6 +253,10 @@ def dispatch(job, progress):
         path = config.DATA / 'sources' / source['id'] / 'transcript.json'
         words = json.loads(path.read_text()) if path.exists() else []
         return editor.focus_track(config.DATA / source['path'], clip, config.DATA / 'jobs' / job['id'], progress, words)
+    if kind == 'subject-gallery':
+        from .subject_tracking import candidates
+        clip=store.get(id,'clip');source=store.get(clip['source_id'],'source')
+        return {'items':candidates(config.DATA/source['path'],clip,progress=progress,refresh=bool(job['payload'].get('refresh')))}
     if kind == 'render':
         clip = job['payload']['clip']
         source = store.get(clip['source_id'], 'source')

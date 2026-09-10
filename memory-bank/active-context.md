@@ -126,3 +126,15 @@ return no holds and therefore never replace moving footage with a JPEG. The
 browser now converts any unexpected non-JSON error response into a concise
 Vietnamese message instead of exposing a JSON parser exception. Candidate only;
 no stable acceptance or handoff yet.
+
+## v9 RC.4 — background face suggestions — 2026-09-10
+
+The 4K AV1 test source exposed that OpenCV cannot seek its frames reliably,
+which made the old synchronous face gallery return an empty list even when a
+clear face was visible. Face suggestion now extracts only nine FFmpeg-decoded
+stills inside the selected proposal, then uses the existing local engine to
+offer up to six clear, distinct portraits. It is a persistent background job,
+so leaving the inspector/tab does not cancel scanning; completed results remain
+available for that clip. Choosing a portrait saves it and queues tracking in
+one action. Intro title-size accepts typed replacement values on blur/Enter.
+Candidate only; no stable acceptance or handoff yet.

@@ -11,11 +11,12 @@ import re
 import threading
 from pathlib import Path
 from . import config
-from .media import ffmpeg
-from .face_engine import describe, portrait, best_match
+from .media import ffmpeg, frame
+from .face_engine import describe, portrait, best_match, cosine
 
 _lock = threading.RLock()
-VERSION = 'reference-v5-dynamic-arcface'
+VERSION = 'reference-v6-dynamic-arcface'
+GALLERY_VERSION = 'clear-faces-v2'
 
 
 def reference(source, token):
@@ -27,39 +28,83 @@ def reference(source, token):
     return json.loads(path.read_text())
 
 
-def candidates(source, clip, seconds=None):
-    """Small on-demand gallery; show samples rather than pretending to deduplicate identities."""
+def _gallery_times(clip, seconds=None):
+    if seconds is not None:
+        if not clip['start'] <= seconds < clip['end']:
+            raise ValueError('Chọn khung hình trong clip.')
+        return [round(seconds, 3)]
+    # This is deliberately scoped to the selected proposal, never the whole
+    # source.  Nine evenly spaced samples find both wide and close camera views
+    # while staying small enough for the background queue.
+    return [round(clip['start']+(clip['end']-clip['start'])*f, 3) for f in (.02,.12,.23,.34,.45,.56,.67,.79,.91)]
+
+
+def _gallery_cache(directory, clip, seconds=None):
+    times=_gallery_times(clip,seconds)
+    key=hashlib.sha256(json.dumps([GALLERY_VERSION,clip['id'],clip['start'],clip['end'],times],sort_keys=True).encode()).hexdigest()[:24]
+    return directory / ('gallery-'+key+'.json')
+
+
+def cached_candidates(source, clip, seconds=None):
+    directory=Path(source).parent/'subjects'
+    cache=_gallery_cache(directory,clip,seconds)
+    return json.loads(cache.read_text()) if cache.exists() else []
+
+
+def candidates(source, clip, seconds=None, progress=None, refresh=False):
+    """Suggest a small set of sharp, distinct portraits inside this clip.
+
+    OpenCV cannot reliably seek some 4K AV1 YouTube files on the host. FFmpeg
+    does decode them, so it extracts the still first and OpenCV only reads that
+    JPEG. Embeddings are used transiently to remove duplicate samples; they are
+    never written to the source gallery.
+    """
     import cv2
-    directory = Path(source).parent / 'subjects'; directory.mkdir(exist_ok=True)
-    times = [seconds] if seconds is not None else [clip['start']+(clip['end']-clip['start'])*f for f in (.01,.08,.2,.4,.65,.85)]
-    if any(not clip['start'] <= t < clip['end'] for t in times):
-        raise ValueError('Chọn khung hình trong clip.')
-    key = hashlib.sha256(json.dumps([VERSION, times]).encode()).hexdigest()[:24]
-    cache = directory / ('gallery-'+key+'.json')
+    directory=Path(source).parent/'subjects';directory.mkdir(exist_ok=True)
+    cache=_gallery_cache(directory,clip,seconds)
     with _lock:
+        if refresh:
+            cache.unlink(missing_ok=True)
         if cache.exists(): return json.loads(cache.read_text())
-        cap = cv2.VideoCapture(str(source));items=[]
-        try:
-            for t in times:
-                cap.set(cv2.CAP_PROP_POS_MSEC,t*1000);ok,img=cap.read()
-                if not ok:continue
-                h,w=img.shape[:2]
-                for candidate in sorted(describe(img),key=lambda item:(item['box'][2]-item['box'][0])*(item['box'][3]-item['box'][1]),reverse=True)[:4]:
-                    box=candidate['box']
-                    x1,y1,x2,y2=box;fw=x2-x1;fh=y2-y1
-                    if fw<.035 or fh<.07:continue
-                    token=hashlib.sha256(json.dumps([str(source),round(t,3),box]).encode()).hexdigest()[:24]
-                    # Include shoulders/hair to support matching during profile turns.
-                    left=max(0,int((x1-fw*.5)*w));right=min(w,int((x2+fw*.5)*w))
-                    top=max(0,int((y1-fh*.4)*h));bottom=min(h,int((y2+fh*1.2)*h))
-                    target=directory/(token+'.jpg')
-                    portrait=img[top:bottom,left:right];portrait=cv2.resize(portrait,(240,max(1,round(portrait.shape[0]*240/portrait.shape[1]))))
-                    cv2.imwrite(str(target),portrait)
-                    record={'id':token,'time':round(t,3),'face':box,'path':str(target.relative_to(config.DATA))}
-                    (directory/(token+'.json')).write_text(json.dumps(record))
-                    items.append(record)
-        finally:cap.release()
-        cache.write_text(json.dumps(items));return items
+        times=_gallery_times(clip,seconds);detected=[]
+        work=directory/('scan-'+cache.stem);work.mkdir(exist_ok=True)
+        for index,t in enumerate(times,1):
+            if progress: progress(f'Đang tìm khuôn mặt rõ trong đoạn · {index}/{len(times)}',5+int(index/max(1,len(times))*75))
+            still=work/f'{index:02d}.jpg'
+            frame(source,still,t)
+            image=cv2.imread(str(still))
+            if image is None: continue
+            h,w=image.shape[:2]
+            for candidate in describe(image):
+                x1,y1,x2,y2=candidate['box'];fw=x2-x1;fh=y2-y1
+                if fw<.035 or fh<.07: continue
+                area=fw*fh
+                detected.append({'time':t,'box':candidate['box'],'embedding':candidate['embedding'],'area':area,'image':image,'width':w,'height':h})
+        # Keep the sharpest/clearest occurrence of each face. A person in a
+        # different camera angle can still be selected because this gallery is
+        # only the reference image, not the final tracking result.
+        unique=[]
+        for item in sorted(detected,key=lambda row:row['area'],reverse=True):
+            if any(cosine(item['embedding'],existing['embedding'])>.68 for existing in unique):
+                continue
+            unique.append(item)
+            if len(unique)>=6: break
+        records=[]
+        for item in unique:
+            box=item['box'];x1,y1,x2,y2=box;fw=x2-x1;fh=y2-y1;image=item['image'];w=item['width'];h=item['height']
+            token=hashlib.sha256(json.dumps([str(source),round(item['time'],3),box],sort_keys=True).encode()).hexdigest()[:24]
+            left=max(0,int((x1-fw*.5)*w));right=min(w,int((x2+fw*.5)*w));top=max(0,int((y1-fh*.4)*h));bottom=min(h,int((y2+fh*1.2)*h))
+            crop=image[top:bottom,left:right]
+            if crop.size==0: continue
+            target=directory/(token+'.jpg')
+            crop=cv2.resize(crop,(240,max(1,round(crop.shape[0]*240/crop.shape[1]))))
+            cv2.imwrite(str(target),crop)
+            record={'id':token,'time':round(item['time'],3),'face':box,'path':str(target.relative_to(config.DATA))}
+            (directory/(token+'.json')).write_text(json.dumps(record))
+            records.append(record)
+        cache.write_text(json.dumps(records));
+        if progress: progress(f'Đã gợi ý {len(records)} khuôn mặt rõ để chọn',95)
+        return records
 
 
 def observations(raw, samples):

@@ -145,3 +145,14 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
   selected-reference plans continue to return zero holds.
 - Final checks: 153 Python tests pass and the Vite production build passes.
   Docker health/API verification is recorded after the rebuild.
+
+## v0.9.0-rc.4 — background face suggestions — 2026-09-10
+
+- Reproduced the empty gallery on the active 3840×2160 AV1 source: OpenCV logs
+  AV1 seek failures and returned no faces, while FFmpeg extracted the same
+  visible frame and the local SCRFD/ArcFace engine detected the speaker.
+- Ran the new background gallery against clip `37cedfd147c84b308bd3f01f1cd1234e`
+  (339.88–583.88s). It completed after nine in-clip samples and returned six
+  selectable portrait records, including the yellow-shirt speaker.
+- Final checks: 155 Python tests and Vite production build pass. Docker health
+  verification is recorded after the rebuild.

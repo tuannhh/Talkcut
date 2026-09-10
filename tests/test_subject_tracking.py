@@ -1,6 +1,6 @@
 import pytest
 from backend.schemas import Settings
-from backend.subject_tracking import observations,appearance_observations,assemble
+from backend.subject_tracking import observations,appearance_observations,assemble,_gallery_times,_gallery_cache,cached_candidates
 from backend.focus import prepared_track,cache_dir
 from backend.presets import styles
 from backend.title_fonts import title_font
@@ -131,3 +131,23 @@ def test_arcface_match_requires_a_clear_margin_over_other_faces():
     # A close second face means the edit must abstain rather than switch
     # between interview participants.
     assert best_match(reference,[selected,{**listener,'embedding':[.38]+[0.0]*511}]) is None
+
+
+def test_gallery_samples_are_limited_to_the_selected_clip_and_cache_is_read_only(tmp_path):
+    clip={'id':'clip','start':100,'end':160}
+    times=_gallery_times(clip)
+    assert len(times)==9
+    assert all(100 <= item < 160 for item in times)
+    directory=tmp_path/'subjects';directory.mkdir()
+    cache=_gallery_cache(directory,clip)
+    cache.write_text('[{"id":"a","path":"subjects/a.jpg"}]')
+    assert cached_candidates(tmp_path/'source.mp4',clip)==[{"id":"a","path":"subjects/a.jpg"}]
+
+
+def test_subject_gallery_scan_is_persistent_queue_work(monkeypatch):
+    import backend.app as api
+    monkeypatch.setattr(api.store,'get',lambda id,*args: {'id':id})
+    seen=[]
+    monkeypatch.setattr(api.pipeline,'enqueue',lambda kind,target,payload: seen.append((kind,target,payload)) or {'kind':kind,'target':target})
+    assert api.scan_subject_gallery('clip')=={'kind':'subject-gallery','target':'clip'}
+    assert seen==[('subject-gallery','clip',{'refresh':False})]

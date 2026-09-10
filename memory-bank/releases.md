@@ -56,3 +56,10 @@ Candidate preserving v0.9.0-rc.2 as its rollback point. It restores the
 ordinary reaction-hold image helper that a previous cleanup removed, without
 changing selected-subject plans (which explicitly have no static holds).
 No SQLite migration; await user review before stable promotion.
+
+### v0.9.0-rc.4 — background face suggestions
+
+Candidate preserving v0.9.0-rc.3 as its rollback point. Adds a persistent
+clip-scoped portrait suggestion job using FFmpeg-decoded stills, avoiding the
+host OpenCV AV1 seek limitation. No SQLite migration; await user review before
+stable promotion.

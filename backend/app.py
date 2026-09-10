@@ -366,9 +366,17 @@ def static_framing(id: str, body: ClipEdit):
 
 @app.get('/api/clips/{id}/subjects')
 def subject_gallery(id: str, time: float | None = Query(None,ge=0)):
-    from .subject_tracking import candidates
+    from .subject_tracking import cached_candidates
     clip=store.get(id,'clip');source=store.get(clip['source_id'],'source')
-    return {'items':candidates(config.DATA/source['path'],clip,time)}
+    return {'items':cached_candidates(config.DATA/source['path'],clip,time)}
+
+
+@app.post('/api/clips/{id}/subjects/scan')
+def scan_subject_gallery(id: str, refresh: bool = False):
+    # The scan is persistent queue work, so changing inspector tabs or leaving
+    # the editor never cancels it. Results remain scoped to this proposal.
+    store.get(id,'clip')
+    return pipeline.enqueue('subject-gallery',id,{'refresh':refresh})
 
 
 @app.post('/api/clips/{id}/focus')

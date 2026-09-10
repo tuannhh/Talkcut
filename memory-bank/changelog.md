@@ -100,3 +100,13 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
 - Hardened the browser API client against plain-text server errors, showing a
   recoverable Vietnamese error instead of `Unexpected token ... valid JSON`.
 - Validation: 153 Python tests and Vite production build pass.
+
+### v0.9.0-rc.4 — 2026-09-10
+
+- Replaced synchronous OpenCV video seeking for face suggestions with FFmpeg
+  frame extraction, fixing empty results on the 4K AV1 YouTube source.
+- Face suggestions run as a persistent, clip-scoped `subject-gallery` queue
+  job; the inspector can close while it continues. The UI auto-starts it and
+  selecting a portrait queues tracking directly.
+- The intro title-size field now permits clearing and typing a replacement
+  value before committing it on blur or Enter.
