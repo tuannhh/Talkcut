@@ -15,8 +15,8 @@ from .media import ffmpeg, frame
 from .face_engine import describe, portrait, best_match, cosine
 
 _lock = threading.RLock()
-VERSION = 'reference-v6-dynamic-arcface'
-GALLERY_VERSION = 'clear-faces-v2'
+VERSION = 'reference-v7-native-recovery'
+GALLERY_VERSION = 'clear-faces-v3-sharpness'
 
 
 def reference(source, token):
@@ -51,6 +51,10 @@ def cached_candidates(source, clip, seconds=None):
     return json.loads(cache.read_text()) if cache.exists() else []
 
 
+def gallery_scanned(source, clip, seconds=None):
+    return _gallery_cache(Path(source).parent/'subjects',clip,seconds).exists()
+
+
 def candidates(source, clip, seconds=None, progress=None, refresh=False):
     """Suggest a small set of sharp, distinct portraits inside this clip.
 
@@ -79,12 +83,15 @@ def candidates(source, clip, seconds=None, progress=None, refresh=False):
                 x1,y1,x2,y2=candidate['box'];fw=x2-x1;fh=y2-y1
                 if fw<.035 or fh<.07: continue
                 area=fw*fh
-                detected.append({'time':t,'box':candidate['box'],'embedding':candidate['embedding'],'area':area,'image':image,'width':w,'height':h})
+                patch=image[max(0,int(y1*h)):min(h,int(y2*h)),max(0,int(x1*w)):min(w,int(x2*w))]
+                sharpness=float(cv2.Laplacian(cv2.cvtColor(patch,cv2.COLOR_BGR2GRAY),cv2.CV_64F).var()) if patch.size else 0
+                quality=math.sqrt(area)*min(1,sharpness/120)
+                detected.append({'time':t,'box':candidate['box'],'embedding':candidate['embedding'],'area':area,'quality':quality,'image':image,'width':w,'height':h})
         # Keep the sharpest/clearest occurrence of each face. A person in a
         # different camera angle can still be selected because this gallery is
         # only the reference image, not the final tracking result.
         unique=[]
-        for item in sorted(detected,key=lambda row:row['area'],reverse=True):
+        for item in sorted(detected,key=lambda row:row['quality'],reverse=True):
             if any(cosine(item['embedding'],existing['embedding'])>.68 for existing in unique):
                 continue
             unique.append(item)
@@ -213,10 +220,9 @@ def analyze(source, clip, progress):
     cuts=layout.get('visual_cuts',[]);bounds=[0,*cuts,duration];samples=[];caps={}
     try:
         for shot,(a,b) in enumerate(zip(bounds,bounds[1:])):
-            # The portrait is intentionally locked per camera shot. Two
-            # samples are sufficient in a long shot; scanning every 1.5s
-            # slowed the focus job without improving the stable result.
-            count=1 if b-a <= 10 else 2
+            # Lock the portrait per camera shot. Sample long shots every
+            # four seconds (up to twelve observations) to verify safe bounds.
+            count=max(1,min(12,math.ceil((b-a)/4)))
             for j in range(count):
                 t=a+(b-a)*(j+.5)/count;i=int(t//30)
                 if i not in caps:caps[i]=cv2.VideoCapture(str(directory/f'shots-{i}.mp4'))
@@ -241,6 +247,21 @@ def analyze(source, clip, progress):
             if index == len(samples) or index % 4 == 0:
                 progress(f'Đang đối chiếu chân dung đã chọn · {index}/{len(samples)}',20+int(index/max(1,len(samples))*65))
     samples=sorted(prepared,key=lambda sample:sample['id'])
+    # Retry uncertain shots on two original-source frames. The 720px/6fps
+    # scouting proxy can erase a profile face in a wide shot. Never relax the
+    # identity threshold or borrow another camera's coordinates to claim a match.
+    recovered=[]
+    uncertain=[i for i in range(len(bounds)-1) if not any(s['shot']==i and s.get('face') for s in samples)]
+    for n,shot in enumerate(uncertain):
+        a,b=bounds[shot:shot+2]
+        progress(f'Đang kiểm tra góc khó ở ảnh gốc · {n+1}/{len(uncertain)}',86+int(8*n/max(1,len(uncertain))))
+        for fraction in (.25,.75):
+            t=a+(b-a)*fraction;path=directory/f'native-{shot}-{fraction}.jpg'
+            ffmpeg(['-ss',str(clip['start']+t),'-i',source,'-frames:v','1','-vf','scale=1440:-2','-q:v','2',path])
+            image=cv2.imread(str(path));match=best_match(reference_embedding,describe(image)) if image is not None else None
+            if match:
+                recovered.append({'id':len(samples)+len(recovered),'shot':shot,'time':t,'face':match['box']})
+    samples=sorted([*samples,*recovered],key=lambda sample:sample['time'])
     result=assemble(samples,cuts,clip,token);result['source_fps']=layout.get('source_fps',30)
     result['speech_turns']=layout.get('speech_turns',[])
     temp=directory/'focus.tmp';temp.write_text(json.dumps(result,ensure_ascii=False));temp.replace(directory/'focus.json')

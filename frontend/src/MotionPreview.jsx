@@ -4,8 +4,15 @@ import {focusAt,focusGeometry,staticCenter} from './studio-helpers.mjs';
 export function MotionPreview({video,clip,plan,points,info,media}){
  const canvas=useRef();const s=clip.settings;
  useEffect(()=>{
+  const v=video.current;if(!v||!s.sound_effect||s.sound_effect==='none')return;
+  const audio=new Audio('/api/sound-effects/'+s.sound_effect);
+  const play=()=>{if(v.currentTime-clip.start<.25&&!v.muted){audio.currentTime=0;audio.volume=v.volume;audio.play().catch(()=>{});}};
+  const stop=()=>audio.pause();v.addEventListener('play',play);v.addEventListener('pause',stop);
+  return()=>{audio.pause();v.removeEventListener('play',play);v.removeEventListener('pause',stop);};
+ },[clip.id,clip.start,s.sound_effect]);
+ useEffect(()=>{
   const v=video.current,out=canvas.current;if(!v||!out)return;
-  const ctx=out.getContext('2d'),W=360,H=640;out.width=W;out.height=H;
+  const ctx=out.getContext('2d'),W=720,H=1280;out.width=W;out.height=H;
   const buffers=Array.from({length:3},()=>{const c=document.createElement('canvas');c.width=W;c.height=H;return c;});
   let previous=null,outgoing=null,activeCut=null;
   const holds=(s.calm_short_shots||plan?.reference_tracking)&&plan?.framing_mode===s.crop_mode?plan?.holds||[]:[],images=new Map();

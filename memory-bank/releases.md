@@ -63,3 +63,13 @@ Candidate preserving v0.9.0-rc.3 as its rollback point. Adds a persistent
 clip-scoped portrait suggestion job using FFmpeg-decoded stills, avoiding the
 host OpenCV AV1 seek limitation. No SQLite migration; await user review before
 stable promotion.
+
+## v0.10.0-rc.1 — reference style candidate
+
+Dựng nhanh, reference-video templates and native-source tracking recovery.
+Validated two real reference analyses, a 22.034-second Full-HD render, background
+portrait scan, 159 Python tests and 6 JS tests. See VALIDATION.md. Composition
+stacking/B-roll/complex motion remain documented observations, not automatic
+reconstruction. This is an RC for user review, not a stable handoff. The local
+checkpoint includes both Docker images and a SQLite snapshot; rollback keeps
+current media and edits by default.

@@ -6,12 +6,14 @@ COPY frontend/ ./
 RUN npm run build
 
 FROM python:3.12-slim-bookworm
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core ca-certificates libglib2.0-0 libgl1 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core fontconfig ca-certificates libglib2.0-0 libgl1 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend ./backend
+COPY backend/fonts /usr/local/share/fonts/talkcut
+RUN fc-cache -f
 COPY --from=frontend /build/dist ./frontend/dist
 RUN useradd -m -u 10001 studio && mkdir /data && chown studio:studio /data
 USER studio

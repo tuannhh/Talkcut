@@ -156,3 +156,42 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
   selectable portrait records, including the yellow-shirt speaker.
 - Final checks: 155 Python tests and Vite production build pass. Docker health
   verification is recorded after the rebuild.
+
+## v0.10.0-rc.1 — reference styles and quick editing — 2026-09-10
+
+- Both user-supplied TikTok references were uploaded through the actual multipart
+  API and analyzed successfully by Gemini with full proxy video and audio.
+  Records: `f8b53da4c49847f091b9184edb00c1cb` (portrait, dark-box captions) and
+  `2e1e3374d0ef462ba4dea76eef83dad4` (mixed/stacked composition, illustrative
+  footage). Both remain available in the local template library.
+- Live API apply checks preserved the current subject, crop mode and zoom and
+  did not modify the stored clip. Browser applied the first reference into an
+  unsaved draft: Roboto, 42px, 7 words, y=82%, dark box, no karaoke were visible
+  in the detailed caption controls. No user settings were saved by this test.
+- Real-media probe used the 3840×2160 AV1 source `G5vFOYti6QA`, source interval
+  339.88–359.88s, with the selected yellow-shirt participant. Native tracking
+  completed in 39.41s: 3 camera shots, 3 selected-subject matches, 0 uncertain
+  shots and 0 portrait holds. This is a short regression probe, not a claim of
+  error-free matching throughout every source.
+- Rendered a 22.034-second 1080×1920 H.264/AAC MP4: 2-second source-frame intro
+  fixture plus 20-second main footage, actual timed captions, opening title,
+  Mix, watermark, synthesized ding and a test background music fixture. This
+  exercises audio/video input indexing and intro cue offset. It does not test
+  Google TTS or regenerate an intro narration. Entire output decoded without
+  errors. Viewed output at 2.7, 8 and 19 seconds: selected participant remains
+  visible at close and side angles, with distinct moving frames and captions.
+  Proof: `../talkcut-v10-preview.mp4`; runtime proof `/data/jobs/qa-v10/`.
+- Browser checked the default Dựng nhanh inspector, detailed caption navigation,
+  reference application, and computed action colors #0086ff / #ffffff in Light
+  mode. A gallery scan was started and the panel switched to captions; it
+  continued to completion, returning 5 portraits for the first AIforAi clip.
+  No new Dark-mode visual acceptance or full-length render is claimed here.
+- Final suite: 159 Python tests, 6 JavaScript tests, Vite and Docker builds pass.
+  Docker restarted after confirming no queued/running jobs. Data retained:
+  6 sources, 19 clips, 8 existing exports, 1 channel preset, 2 learned templates.
+- Scope: applied templates cover subtitle styling, Mix duration, opening title
+  from the NEW clip and a synthesized opening sound cue. Stacked composition,
+  B-roll selection, music mood and complex animated highlight layers remain
+  observations, explicitly labelled as not automatically reconstructed. These
+  require further implementation; this candidate is not a complete imitation
+  engine or an accepted stable handoff.

@@ -108,6 +108,13 @@ class Settings(BaseModel):
     watermark_opacity: float = Field(default=0.55, ge=0.05, le=1)
     watermark_scale: float = Field(default=0.32, ge=0.05, le=0.8)
     caption_enabled: bool = True
+    main_title_enabled: bool = False
+    main_title_seconds: float = Field(default=3,ge=1,le=6,allow_inf_nan=False)
+    main_title_color: str = Field(default='#ffffff',pattern=r'^#[0-9a-fA-F]{6}$')
+    sound_effect: Literal['none','pop','ding','whoosh'] = 'none'
+    caption_font: Literal['DejaVu Sans','Google Sans','Open Sans','Barlow','Roboto'] = 'DejaVu Sans'
+    caption_box: bool = False
+    caption_karaoke: bool = True
     caption_size: int = Field(default=62, ge=32, le=92)
     caption_y: float = Field(default=0.73, ge=0.3, le=0.83)
     caption_color: str = Field(default='#dfff00', pattern=r'^#[0-9a-fA-F]{6}$')

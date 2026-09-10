@@ -99,6 +99,51 @@ def list_presets():
     return store.listing('preset')
 
 
+@app.get('/api/style-templates')
+def list_style_templates():
+    return store.listing('style-template')
+
+
+@app.get('/api/sound-effects/{kind}')
+def preview_sound_effect(kind: str):
+    from .sound_effects import cue
+    return FileResponse(cue(kind),media_type='audio/wav')
+
+
+@app.post('/api/style-templates')
+async def upload_style_template(file: UploadFile = File(...)):
+    name=Path(file.filename or 'Video mẫu').name
+    ext=Path(name).suffix.lower()
+    if ext not in ('.mp4','.mov','.webm','.m4v'):
+        raise ValueError('Chọn video mẫu MP4, MOV hoặc WEBM.')
+    folder=config.DATA/'templates'/uuid.uuid4().hex
+    folder.mkdir(parents=True)
+    path=folder/('reference'+ext)
+    await upload(file,path,min(config.MAX_BYTES,512*1024**2))
+    try:
+        info=probe(path)
+        if not info.get('width') or not 2<=info['duration']<=180:
+            raise ValueError('Video mẫu phải dài từ 2 giây đến 3 phút.')
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+    item=store.create('style-template',{'name':Path(name).stem[:80],'path':str(path.relative_to(config.DATA)), 'status':'analyzing'})
+    return pipeline.enqueue('style-template',item['id'])
+
+
+@app.post('/api/style-templates/{id}/retry')
+def retry_style_template(id: str):
+    store.get(id,'style-template')
+    store.update(id,status='analyzing',error=None)
+    return pipeline.enqueue('style-template',id)
+
+
+@app.post('/api/style-templates/{id}/apply')
+def apply_style_template(id: str, body: Settings):
+    from .style_templates import apply
+    return {'settings':apply(id,body.model_dump())}
+
+
 @app.post('/api/presets')
 def create_preset(body: presets.PresetRequest):
     return presets.save(body)
@@ -366,9 +411,9 @@ def static_framing(id: str, body: ClipEdit):
 
 @app.get('/api/clips/{id}/subjects')
 def subject_gallery(id: str, time: float | None = Query(None,ge=0)):
-    from .subject_tracking import cached_candidates
+    from .subject_tracking import cached_candidates, gallery_scanned
     clip=store.get(id,'clip');source=store.get(clip['source_id'],'source')
-    return {'items':cached_candidates(config.DATA/source['path'],clip,time)}
+    return {'items':cached_candidates(config.DATA/source['path'],clip,time), 'scanned':gallery_scanned(config.DATA/source['path'],clip,time)}
 
 
 @app.post('/api/clips/{id}/subjects/scan')

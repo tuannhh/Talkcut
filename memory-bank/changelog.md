@@ -110,3 +110,19 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
   selecting a portrait queues tracking directly.
 - The intro title-size field now permits clearing and typing a replacement
   value before committing it on blur or Enter.
+
+## 2026-09-10 — v0.10.0-rc.1
+
+- Default Dựng nhanh flow: suggested subject, reusable reference style, finishing
+  options. Existing detailed controls remain reachable via one flat selector.
+- Persisted background reference-video analysis with validated caption/Mix/title/
+  cue settings and explicit observations for unsupported composition layers.
+- Native-source retry for uncertain profile shots, denser bounded observations
+  on long camera shots, sharpness-ranked portrait suggestions and a 720×1280
+  preview canvas. Gallery cache status distinguishes unscanned from empty.
+- Registered bundled subtitle fonts in Docker. Applying a style preserves user
+  crop coordinates/mode/zoom and the selected person; no reference text replaces
+  the clip's content. Added in-flight apply guard.
+- Verified both supplied references, actual background gallery completion across
+  panel navigation, template draft application and a decoded 22-second Full-HD
+  proof. 159 Python + 6 JS tests pass. See VALIDATION.md for limits and evidence.

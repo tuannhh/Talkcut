@@ -176,9 +176,14 @@ def make_ass(words, clip, settings, target):
     color = color[4:6] + color[2:4] + color[:2]
     lines = ['[Script Info]', 'ScriptType: v4.00+', 'PlayResX: 1080', 'PlayResY: 1920', 'WrapStyle: 0',
              '[V4+ Styles]', 'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-             f'Style: Default,DejaVu Sans,{settings["caption_size"]},&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,4,1,5,85,140,0,1',
+             f'Style: Default,{settings.get("caption_font","DejaVu Sans")},{settings["caption_size"]},&H00FFFFFF,&H00FFFFFF,&H{"80101010" if settings.get("caption_box") else "00101010"},&H80000000,-1,0,0,0,100,100,0,0,{3 if settings.get("caption_box") else 1},{8 if settings.get("caption_box") else 4},1,5,85,140,0,1',
+             f'Style: Hook,Barlow,76,&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,5,100,100,0,1',
              '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text']
-    for group in subtitle_groups(selected, settings['caption_words']):
+    if clip.get('title') and settings.get('main_title_enabled'):
+        c=settings.get('main_title_color','#ffffff').lstrip('#');c=c[4:6]+c[2:4]+c[:2]
+        text=ass_escape(clip['title'].upper())
+        lines.append(f'Dialogue: 1,0:00:00.00,{ass_time(min(settings.get("main_title_seconds",3),clip["end"]-clip["start"]))},Hook,,0,0,0,,{{\\an5\\pos(540,960)\\c&H{c}&}}{text}')
+    for group in subtitle_groups(selected, settings['caption_words']) if settings.get('caption_enabled',True) else []:
         # One event per spoken word, plus neutral gaps. No proportional timing guesses.
         boundaries = sorted({w['start'] for w in group} | {w['end'] for w in group})
         for start, end in zip(boundaries, boundaries[1:]):
@@ -186,7 +191,7 @@ def make_ass(words, clip, settings, target):
                 continue
             texts = []
             for word in group:
-                active = word['start'] <= (start + end) / 2 < word['end']
+                active = settings.get('caption_karaoke',True) and word['start'] <= (start + end) / 2 < word['end']
                 texts.append('{\\c&H' + (color if active else 'FFFFFF') + '&}' + ass_escape(word['text']))
             body = '{\\an5\\pos(' + str(round(settings.get('caption_x',510/1080)*W)) + ',' + str(round(settings['caption_y'] * H)) + ')}' + ' '.join(texts)
             lines.append(f'Dialogue: 0,{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{body}')
@@ -265,7 +270,7 @@ def still_segment(image, target, seconds, audio=None, captions=None):
     args += ['-i', audio] if audio else ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo']
     if captions:
         escaped=str(captions).replace('\\','\\\\').replace(':','\\:').replace("'","'\\''")
-        args += ['-vf', f"ass='{escaped}'"]
+        args += ['-vf', f"ass='{escaped}':fontsdir='{Path(__file__).parent / 'fonts'}'"]
     ffmpeg([*args, '-map', '0:v', '-map', '1:a', '-af', 'apad', '-t', str(seconds), *encode_args(), target])
 
 
@@ -332,13 +337,13 @@ def render(source, clip, words, settings, directory, progress):
     from .transitions import transition_plan,visual_filters
     pacing=transition_plan(track,info,settings)
     vf += ','+visual_filters(pacing,settings.get('mix_seconds',.24))
-    if settings['caption_enabled']:
-        if not words:
+    if settings['caption_enabled'] or settings.get('main_title_enabled'):
+        if settings['caption_enabled'] and not words:
             raise ValueError('Chưa có transcript. Phân tích nguồn trước hoặc tắt phụ đề.')
         make_ass(words, clip, settings, directory / 'captions.ass')
         # Generated UUID-only paths under DATA; no user text enters filter syntax.
         escaped = str(directory / 'captions.ass').replace('\\', '\\\\').replace(':', '\\:').replace("'", "'\\''")
-        vf += f",ass='{escaped}'"
+        vf += f",ass='{escaped}':fontsdir='{Path(__file__).parent / 'fonts'}'"
     progress('Đang dựng nội dung và phụ đề karaoke Full HD', 42)
     ffmpeg(['-ss', str(clip['start']), '-i', source, '-t', str(clip['end'] - clip['start']), '-vf', vf,
             '-af', 'aresample=48000,apad', *encode_args(), directory / 'main.mp4'])
@@ -367,6 +372,15 @@ def render(source, clip, words, settings, directory, progress):
                     '[0:a]asplit=2[voice][side]', '[bg][side]sidechaincompress=threshold=0.025:ratio=8:attack=20:release=500[duck]',
                     '[voice][duck]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[aout]']
         a = '[aout]'
+    if settings.get('sound_effect','none')!='none':
+        from .sound_effects import cue
+        if settings['music_asset']:index+=1
+        args += ['-i',cue(settings['sound_effect'])]
+        delay=round(sum(probe(p)['duration'] for p in parts[:parts.index(directory/'main.mp4')])*1000)
+        filters.append(f'[{index}:a]adelay={delay}:all=1[cue]')
+        voice=a if a.startswith('[') else f'[{a}]'
+        filters.append(f'{voice}[cue]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[sfxout]')
+        a='[sfxout]'
     if filters:
         args += ['-filter_complex', ';'.join(filters), '-map', v, '-map', a, '-t', str(probe(joined)['duration']), *encode_args(), output]
         ffmpeg(args)

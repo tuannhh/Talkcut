@@ -138,3 +138,41 @@ so leaving the inspector/tab does not cancel scanning; completed results remain
 available for that clip. Choosing a portrait saves it and queues tracking in
 one action. Intro title-size accepts typed replacement values on blur/Enter.
 Candidate only; no stable acceptance or handoff yet.
+
+## v10 — reference styles and simpler editing — 2026-09-10 (candidate)
+
+Latest request: study the two supplied TikTok videos, improve framing, learn
+reusable styles, and simplify the editor for nontechnical users. Correct
+reference checkout is `/Users/tuanbui/Documents/Codex/2026-09-07/hi-n-nay-tr-n-facebook/outputs/ai-motion-studio-next`.
+Its bounded profile/video-analysis approach was reviewed read-only. The first
+sample uses a stable single portrait and compact dark-box captions; the second
+frequently stacks two camera views and inserts illustrative footage. These are
+different layouts, not simply different zoom strengths.
+
+Dựng nhanh is the default inspector: choose a suggested face, learn/apply a
+reference style, then optional finishing edits. All prior detailed editors are
+available through a flat selection and a return button. Learned styles persist
+in SQLite and analysis runs in the background queue. Analysis receives a
+bounded full-video proxy with audio; the original stays local. Supported style
+mapping includes captions, Mix, a main opening title using the NEW clip title,
+and a synthesized opening sound cue. Stacked view, illustrative footage and
+complex motion layers are recorded as observations but are explicitly not
+claimed as automatically reproduced. Existing channel presets remain available.
+
+Selected-face tracking now samples long shots more densely and retries missing
+shots at two native-source 1440px stills before abstaining, without lowering
+appearance thresholds. Stable shot locking remains; no portrait freezes.
+Gallery ranks face sharpness as well as size. Preview canvas increases from
+360x640 to 720x1280. No stable handoff until user acceptance.
+
+v10 verification completed: both supplied references are ready in the local
+library; a 20s 4K tracking probe found the selected person in all 3 shots without
+holds. The 22.034s final proof includes test intro/music fixtures plus actual
+caption timing/title/Mix/watermark/cue. `../talkcut-v10-preview.mp4` is reviewable.
+Browser template application was tested as an unsaved draft; stored settings
+were not changed. Background face scanning completed after leaving its panel
+(5 portraits). Final checks: 159 Python + 6 JS, Vite and Docker builds. Candidate
+v0.10.0-rc.1 remains pending user acceptance; stacked/B-roll/complex animated
+composition is still not implemented. Do not describe template learning as full
+reconstruction. User requested finishing interrupted work; browser file chooser
+hung previously, so reference uploads were verified through API instead.

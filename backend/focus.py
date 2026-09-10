@@ -20,7 +20,9 @@ LABELS = {'selected':'Chủ thể đã chọn','speaker': 'Người đang nói',
 def cache_dir(source, clip):
     stat = Path(source).stat()
     identity = [VERSION, str(source), stat.st_size, stat.st_mtime_ns, clip['start'], clip['end'], config.CONTENT_MODEL]
-    if clip.get('settings',{}).get('tracking_subject'):identity += ['reference-v5-dynamic',clip['settings']['tracking_subject']]
+    if clip.get('settings',{}).get('tracking_subject'):
+        from .subject_tracking import VERSION as reference_version
+        identity += [reference_version,clip['settings']['tracking_subject']]
     key = hashlib.sha256(json.dumps(identity).encode()).hexdigest()[:32]
     return config.DATA / 'jobs' / ('focus-' + key)
 

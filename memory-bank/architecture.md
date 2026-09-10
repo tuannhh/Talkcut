@@ -77,3 +77,15 @@ reserve CPU for FFmpeg and web preview.
 `scripts/versions.py` checkpoints Studio and face-engine images together. A
 rollback cannot silently load a newer recognition engine; `.active-image`
 derives the matching face-engine tag for `start.sh`.
+
+## v10 reference templates
+
+`style_templates` defines a bounded Pydantic profile, uses an 8fps/480px H264
+proxy with audio (2–180 seconds, <=18MiB) in Gemini, and maps only implemented
+settings. `/api/style-templates` uploads, lists, retries and applies profiles;
+`style-template` queue work persists across tab changes. Reference content,
+logos and identities never overwrite clip content. `sound_effects` synthesizes
+short local cues. ASS renders optional opening text from the current clip title,
+while existing word timestamps drive captions; bundled fonts are registered in
+fontconfig. QuickEditor keeps existing detailed editors available, and shows
+unimplemented profile observations separately from applied settings.

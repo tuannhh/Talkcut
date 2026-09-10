@@ -257,6 +257,9 @@ def dispatch(job, progress):
         from .subject_tracking import candidates
         clip=store.get(id,'clip');source=store.get(clip['source_id'],'source')
         return {'items':candidates(config.DATA/source['path'],clip,progress=progress,refresh=bool(job['payload'].get('refresh')))}
+    if kind == 'style-template':
+        from .style_templates import analyze as analyze_style
+        return analyze_style(store.get(id,'style-template'),progress)
     if kind == 'render':
         clip = job['payload']['clip']
         source = store.get(clip['source_id'], 'source')
@@ -291,6 +294,8 @@ def worker():
             store.update(id, status='failed', error=message[:1800], message='Cần xử lý lại')
             if job['kind'] == 'import':
                 store.update(job['target'], status='failed')
+            if job['kind'] == 'style-template':
+                store.update(job['target'], status='failed',error=message[:600])
         finally:
             jobs.task_done()
 
