@@ -1,0 +1,13 @@
+{
+  "name": "talkcut-face-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "onnxruntime-node": "1.26.0",
+    "sharp": "0.35.1"
+  }
+}

@@ -76,3 +76,24 @@ User explicitly chooses a single installer orchestrating Docker/prerequisites, t
 The user reported that both auto-tracking and fixed screen coordinates fail across wide/close camera angles. v8 introduces choosing a face sample from the current clip, then compares only locally detected candidate faces against that selected portrait with bundled OpenCV SFace. This supersedes trusting Gemini bounding boxes, which were observed to drift to the interviewer in real two-person shots. Low-confidence or undetected profile/occluded shots deliberately become portrait holds marked for review; they must never default to the table or unrelated person. This is source-scoped appearance matching, not identity or active-speaker verification.
 
 The primary VnExpress regression clip `f179175fe81b47079707ce5af7cf3fed` (493.98–654.38) was re-analysed with the male glasses reference. It produced 34 camera shots, 17 conservative holds. The prior false female crop at +81s is now an uncertain hold. A 30-second Full-HD 9:16 proof was rendered, decoded without errors, and at +9s displays the selected male portrait through a missing/ambiguous angle. Full existing user data remains untouched. v0.8.0-rc.1 will remain an RC until the user confirms this behavior in the running editor.
+
+## v9 — SCRFD + ArcFace selected-face tracking — 2026-09-10
+
+The user authorized reusing the proven local face-matching pipeline from
+`/Users/tuanbui/misa-tim-anh-ai`. TalkCut now runs an independent local
+`face-engine` Docker service: SCRFD 10G detects faces and five landmarks;
+ArcFace r50 creates a 512-value source-scoped appearance descriptor after
+alignment. The editor, API, SQLite data and UI remain independent from the
+photo-search project.
+
+One or two still frames are checked per native camera shot, not every 1.5
+seconds. The two-worker background pass keeps preview requests free of ONNX
+work. A match needs a conservative cosine score and a lead over the next face.
+Ambiguous or missing shots remain verified portrait holds; they cannot become
+a table, microphone, or other participant crop.
+
+The 60-second VnExpress regression probe (source 540–600s, selected guest
+wearing glasses) produced 14 camera shots, 11 selected-subject shots and 3
+portrait holds. Wide-camera detections correctly moved to the guest at x≈.80;
+the selected close-camera portraits stayed x≈.51. Candidate `v0.9.0-rc.1`
+awaits user review; it is not a stable handoff.

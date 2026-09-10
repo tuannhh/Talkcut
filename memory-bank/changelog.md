@@ -60,3 +60,19 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
 ### Distribution requirements — 2026-09-09 (documentation only)
 - Recorded user-selected all-in-one installer flow retaining Docker, first-run Gemini API key and Internet requirement.
 - Added provisional Windows minimum/recommended hardware and release validation gates. Packaging deferred until stable acceptance; no new runtime version.
+
+### v0.9.0-rc.1 — 2026-09-10
+
+- Replaced selected-face tracking's Haar + SFace path with a local SCRFD 10G
+  detector, five-landmark alignment and ArcFace r50 512-value appearance
+  embeddings adapted from the user's high-accuracy face-search project.
+- Added an internal Docker `face-engine` with two bounded ONNX workers. It is
+  not exposed on a host port, uses no Google request, retains no identity
+  catalogue, and persists downloaded models only in the local Docker volume.
+- Focus checks one still per short camera shot and two per long shot. This
+  removes expensive per-1.5-second scanning while keeping shot locking and Mix
+  pacing.
+- Matching accepts only a clear winner. Ambiguous, profile or missing scenes
+  use a verified portrait hold instead of moving the crop to a table,
+  microphone or other guest.
+- Version checkpoints now capture Studio and face-engine images together.

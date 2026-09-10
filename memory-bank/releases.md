@@ -32,3 +32,12 @@ Candidate introducing explicit stationary subject framing and separate moving-su
 ### v0.8.0-rc.1 — selected face tracking
 
 Candidate adding source-scoped SFace appearance comparison, conservative verified portrait holds and bundled title fonts. Retains v0.7.1-rc.1 as rollback target. No SQLite migration; tracking reference tokens are content-specific and presets remain portable. Await user acceptance before stable promotion.
+
+### v0.9.0-rc.1 — SCRFD + ArcFace tracking
+
+Candidate replacing the selected-subject detector/comparator with the local
+SCRFD 10G + ArcFace r50 engine. The checkpoint records both the Studio image
+and face-engine image, while media and SQLite remain in the existing volume.
+The first use downloads roughly 190 MB of ONNX models into that volume. No
+database migration or content-specific preset change. Await user review before
+stable promotion.

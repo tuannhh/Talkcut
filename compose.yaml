@@ -13,9 +13,27 @@ services:
       DATA_DIR: /data
       SOURCE_ROOT: /sources
       RENDER_THREADS: ${RENDER_THREADS:-4}
+      FACE_ENGINE_URL: http://face-engine:3210
     volumes:
       - studio-data:/data
       - ${SOURCE_DIR:-./sources}:/sources:ro
+    shm_size: 256mb
+    stop_grace_period: 30s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+  face-engine:
+    image: ${TALKCUT_FACE_IMAGE:-talkcut-face-engine:latest}
+    build: ./face-engine
+    init: true
+    restart: unless-stopped
+    environment:
+      FACE_ENGINE_WORKERS: ${FACE_ENGINE_WORKERS:-2}
+      FACE_DET_SIZE: ${FACE_DET_SIZE:-1024}
+      FACE_WORK_SIZE: ${FACE_WORK_SIZE:-1600}
+    volumes:
+      - studio-data:/data
     shm_size: 256mb
     stop_grace_period: 30s
     logging:

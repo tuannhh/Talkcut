@@ -101,3 +101,21 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
 - The VnExpress regression clip `f179175fe81b47079707ce5af7cf3fed` was processed end-to-end with the selected portrait of the guest wearing glasses. It has 34 native camera shots; 17 ambiguous/profile shots were intentionally held instead of assigning the interviewer or the table to the guest.
 - A 30-second Full-HD H.264/AAC proof at `/data/jobs/v8-proof-v3/main.mp4` rendered with the same crop, hold and Mix filters as export. FFmpeg decoded the complete proof without errors. The extracted +9 second frame is the selected guest portrait during an ambiguous shot; it no longer cuts to the interviewer/table.
 - SFace remains an appearance comparator within the current source. It does not prove legal identity or detect the active speaker from audio. Long profile/occluded sections require review because the deliberately conservative fallback may hold a prior verified portrait.
+
+## v9 SCRFD + ArcFace selected-face tracking — 2026-09-10
+
+- Docker builds completed for Studio and internal `face-engine`; both health
+  endpoints returned 200. The engine has no published host port.
+- `151` Python tests passed. The new regression confirms that a selected
+  ArcFace descriptor must lead the next detected face by the ambiguity margin
+  before a crop is accepted. JavaScript/Vite sources were unchanged.
+- On the real VnExpress source, the selected glasses-wearing guest was found
+  in a close shot (cosine 0.870), a wide shot (0.405), and another wide/profile
+  sample (0.363). The interviewer sample scored -0.075. The video threshold
+  is lower than photo-gallery recall thresholds but still requires a 0.065 lead
+  over the next local face.
+- A real 60-second tracking probe from source 540–600 seconds generated 14
+  native camera scenes: 11 selected-subject scenes and 3 verified portrait
+  holds. Subject centers were stable around .51 in close shots and .80 in the
+  right-hand wide angle; no fallback center/table geometry was emitted. The
+  probe validates crop planning, not active-speaker identity from voice.

@@ -11,6 +11,8 @@ if [ -f .active-image ]; then
   TALKCUT_IMAGE=$(cat .active-image)
   case "$TALKCUT_IMAGE" in talkcut-studio:v*) ;; *) echo 'Mốc phiên bản không hợp lệ.'; exit 1;; esac
   export TALKCUT_IMAGE
+  TALKCUT_FACE_IMAGE="talkcut-face-engine:${TALKCUT_IMAGE#talkcut-studio:}"
+  export TALKCUT_FACE_IMAGE
   docker compose up -d --no-build
 else
   docker compose up -d --build

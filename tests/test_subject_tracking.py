@@ -4,6 +4,7 @@ from backend.subject_tracking import observations,appearance_observations,assemb
 from backend.focus import prepared_track,cache_dir
 from backend.presets import styles
 from backend.title_fonts import title_font
+from backend.face_engine import best_match
 
 
 def test_reference_rejects_wrong_ids_missing_and_low_confidence():
@@ -96,3 +97,13 @@ def test_rejected_outlier_cannot_become_replacement_portrait():
     samples.append({'id':4,'shot':1,'time':4.2,'face':None})
     track=assemble(samples,[4],{'start':0,'end':6},'a'*24)
     assert track['reference_holds'][0]['frame_time']==2.2
+
+
+def test_arcface_match_requires_a_clear_margin_over_other_faces():
+    reference=[1.0]+[0.0]*511
+    selected={'box':[.6,.1,.8,.4],'embedding':[.42]+[0.0]*511}
+    listener={'box':[.1,.1,.3,.4],'embedding':[.30]+[0.0]*511}
+    assert best_match(reference,[listener,selected]) is selected
+    # A close second face means the edit must hold a verified portrait rather
+    # than switching between interview participants.
+    assert best_match(reference,[selected,{**listener,'embedding':[.38]+[0.0]*511}]) is None

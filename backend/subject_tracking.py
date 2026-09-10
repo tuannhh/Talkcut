@@ -11,11 +11,10 @@ import threading
 from pathlib import Path
 from . import config
 from .media import ffmpeg
-from .face_tracking import faces
-from .appearance import feature as appearance_feature, best_match
+from .face_engine import describe, portrait, best_match
 
 _lock = threading.RLock()
-VERSION = 'reference-v3'
+VERSION = 'reference-v4-arcface'
 
 
 def reference(source, token):
@@ -44,7 +43,8 @@ def candidates(source, clip, seconds=None):
                 cap.set(cv2.CAP_PROP_POS_MSEC,t*1000);ok,img=cap.read()
                 if not ok:continue
                 h,w=img.shape[:2]
-                for box in sorted(faces(img),key=lambda b:(b[2]-b[0])*(b[3]-b[1]),reverse=True)[:4]:
+                for candidate in sorted(describe(img),key=lambda item:(item['box'][2]-item['box'][0])*(item['box'][3]-item['box'][1]),reverse=True)[:4]:
+                    box=candidate['box']
                     x1,y1,x2,y2=box;fw=x2-x1;fh=y2-y1
                     if fw<.035 or fh<.07:continue
                     token=hashlib.sha256(json.dumps([str(source),round(t,3),box]).encode()).hexdigest()[:24]
@@ -137,7 +137,7 @@ def assemble(samples, cuts, clip, token):
     return {'version':VERSION,'start':clip['start'],'end':clip['end'],'subject':token,'reference_tracking':True,
             'keyframes':sorted(points,key=lambda p:p['time']),'scenes':scenes,'visual_cuts':cuts,'reference_holds':holds,
             'note':f'Theo chủ thể đã chọn qua từng góc máy. {len(missing)} cảnh cần duyệt (giữ ảnh chân dung, lời thoại tiếp tục).',
-            'layout_version':'portrait-v5.1','geometry_version':'face-v8'}
+            'layout_version':'portrait-v5.1','geometry_version':'face-v9-arcface'}
 
 
 def analyze(source, clip, progress):
@@ -145,11 +145,10 @@ def analyze(source, clip, progress):
     from . import focus
     token=clip['settings']['tracking_subject'];ref=reference(source,token)
     reference_image=cv2.imread(str(config.DATA/ref['path']))
-    reference_faces=faces(reference_image)
-    if not reference_faces:
+    reference_face=portrait(describe(reference_image))
+    if not reference_face:
         raise ValueError('Ảnh tham chiếu chưa thấy khuôn mặt rõ. Chọn một ảnh khác trong thư viện khuôn mặt.')
-    reference_box=max(reference_faces,key=lambda b:(b[2]-b[0])*(b[3]-b[1]))
-    reference_embedding=appearance_feature(reference_image,reference_box)
+    reference_embedding=reference_face['embedding']
     directory=focus.cache_dir(source,clip);directory.mkdir(exist_ok=True,parents=True)
     # Native cuts are preserved; model observation boundaries never create cuts.
     duration=clip['end']-clip['start'];base=focus.cache_dir(source,{**clip,'settings':{}})
@@ -165,25 +164,34 @@ def analyze(source, clip, progress):
     cuts=layout.get('visual_cuts',[]);bounds=[0,*cuts,duration];samples=[];caps={}
     try:
         for shot,(a,b) in enumerate(zip(bounds,bounds[1:])):
-            # Temporal samples within every shot, including profile views.
-            count=max(1,min(18,math.ceil((b-a)/1.5)))
+            # The portrait is intentionally locked per camera shot. Two
+            # samples are sufficient in a long shot; scanning every 1.5s
+            # slowed the focus job without improving the stable result.
+            count=1 if b-a <= 10 else 2
             for j in range(count):
                 t=a+(b-a)*(j+.5)/count;i=int(t//30)
                 if i not in caps:caps[i]=cv2.VideoCapture(str(directory/f'shots-{i}.mp4'))
                 cap=caps[i];cap.set(cv2.CAP_PROP_POS_MSEC,(t-i*30)*1000);ok,img=cap.read()
                 if not ok:continue
                 ident=len(samples);path=directory/f'observation-{ident}.jpg';cv2.imwrite(str(path),img)
-                boxes=faces(img)
-                # SFace compares the selected portrait with local face crops.
-                # The high threshold abstains on profile/occluded ambiguity;
-                # this is preferable to jumping to the other interviewee.
-                face=best_match(reference_embedding,img,boxes,minimum=.76,margin=.05)
-                samples.append({'id':ident,'shot':shot,'time':round(t,5),'path':str(path),'face':face})
+                samples.append({'id':ident,'shot':shot,'time':round(t,5),'path':str(path)})
     finally:
         for c in caps.values():c.release()
-    for index,sample in enumerate(samples,1):
-        if index == len(samples) or index % 12 == 0:
-            progress(f'Đang đối chiếu chân dung đã chọn · {index}/{len(samples)}',20+int(index/max(1,len(samples))*65))
+    # The engine owns two ONNX workers. This background pass keeps the web
+    # preview responsive while avoiding sequential waits for each still.
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    def match_sample(sample):
+        image=cv2.imread(sample['path'])
+        match=best_match(reference_embedding,describe(image)) if image is not None else None
+        return {**sample,'face':match['box'] if match else None}
+    prepared=[]
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures=[executor.submit(match_sample,sample) for sample in samples]
+        for index,future in enumerate(as_completed(futures),1):
+            prepared.append(future.result())
+            if index == len(samples) or index % 4 == 0:
+                progress(f'Đang đối chiếu chân dung đã chọn · {index}/{len(samples)}',20+int(index/max(1,len(samples))*65))
+    samples=sorted(prepared,key=lambda sample:sample['id'])
     result=assemble(samples,cuts,clip,token);result['source_fps']=layout.get('source_fps',30)
     result['speech_turns']=layout.get('speech_turns',[])
     temp=directory/'focus.tmp';temp.write_text(json.dumps(result,ensure_ascii=False));temp.replace(directory/'focus.json')

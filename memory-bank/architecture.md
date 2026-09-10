@@ -61,3 +61,19 @@ The threshold deliberately abstains on profile, occlusion, or ambiguous two-pers
 
 ## Future distribution decision — 2026-09-09
 Retain Docker for the no-tech Windows installer. A bootstrapper installs/checks Docker and WSL, loads the prebuilt TalkCut Linux amd64 image, starts the service and opens first-run Gemini API key setup. Runtime dependencies stay inside the image. Build only after stable acceptance; see [distribution plan](distribution.md).
+
+## v9 local face engine — 2026-09-10
+
+For user-selected subjects, `face-engine` is a private Docker-network service
+rather than a browser or Google API feature. It uses SCRFD 10G face detection,
+five-point alignment and ArcFace r50 embeddings. The Python editor submits
+still frames to it only in the background focus job. It accepts a local face
+only when its cosine score and lead over the next candidate meet strict video
+thresholds. This is appearance matching within one source, not active-speaker
+verification or a global person database. The ONNX models download to the
+persistent local Docker volume on first use; two workers are the default to
+reserve CPU for FFmpeg and web preview.
+
+`scripts/versions.py` checkpoints Studio and face-engine images together. A
+rollback cannot silently load a newer recognition engine; `.active-image`
+derives the matching face-engine tag for `start.sh`.
