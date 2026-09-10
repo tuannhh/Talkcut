@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from backend import config, store
 from backend.app import app
 from backend.schemas import Settings, AnalyzeRequest, ClipEdit
-from backend.pipeline import youtube_url, source_path, validate_candidates, transcript_segments
+from backend.pipeline import YOUTUBE_FORMAT, youtube_url, source_path, validate_candidates, transcript_segments
 from backend.google_ai import parse_words, offset
 from backend.editor import make_ass, crop_filter, validate_track, watermark_image
 
@@ -22,6 +22,11 @@ def test_google_word_annotations_preserve_real_timestamps():
 @pytest.mark.parametrize('url',['https://youtube.com/watch?v=abcdefghijk','https://youtu.be/abcdefghijk?t=12','https://www.youtube.com/shorts/abcdefghijk'])
 def test_youtube_canonicalizes_video_only(url):
     assert youtube_url(url)=='https://www.youtube.com/watch?v=abcdefghijk'
+
+
+def test_youtube_download_prefers_4k_before_lower_quality_fallbacks():
+    assert 'height<=2160' in YOUTUBE_FORMAT
+    assert YOUTUBE_FORMAT.startswith('bv*')
 
 
 @pytest.mark.parametrize('url',['http://youtube.com/watch?v=abcdefghijk','https://youtube.com.evil.test/watch?v=abcdefghijk','https://localhost/watch?v=abcdefghijk','https://youtube.com/playlist?list=abcdefghijk','https://user:pass@youtube.com/watch?v=abcdefghijk'])

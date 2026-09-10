@@ -97,3 +97,21 @@ wearing glasses) produced 14 camera shots, 11 selected-subject shots and 3
 portrait holds. Wide-camera detections correctly moved to the guest at x≈.80;
 the selected close-camera portraits stayed x≈.51. Candidate `v0.9.0-rc.1`
 awaits user review; it is not a stable handoff.
+
+## v9 RC.2 — high-resolution YouTube and moving ambiguous shots — 2026-09-10
+
+The user accepted the SCRFD/ArcFace tracking behavior, then reported soft
+YouTube image quality and occasional frozen visuals while voice and captions
+continued. The test source `G5vFOYti6QA` had been imported as 640×360 despite
+an available 4K stream. YouTube import now prefers a 2160p MP4 stream and
+keeps compatible MP4 media as the editor preview instead of building a 1280px
+proxy. “Tải lại bản sắc nét” downloads a sibling file, only switches after
+probe success, and preserves transcript/clip configuration.
+
+Selected-subject plans no longer insert portrait JPEGs or short-shot holds.
+An ambiguous camera angle retains a confirmed crop anchor while the source
+video, voice and subtitles continue moving; it remains marked for review.
+The cache namespace is `reference-v5-dynamic`, so an old portrait-hold plan
+cannot be reused. The current test source is upgraded to 3840×2160 AV1 while
+the old 640×360 file remains in the Docker volume. Candidate `v0.9.0-rc.2`
+awaits user review and is not a stable handoff.

@@ -1,7 +1,8 @@
 """User-selected visual reference, relocated independently in each camera shot.
 
 This matches an appearance within a video, not a speaker's real-world identity.
-Missing observations abstain and hold a verified portrait instead of the table.
+Missing observations abstain from a new face decision but retain moving source
+video; a talking clip must never silently turn into a frozen portrait.
 """
 import hashlib
 import json
@@ -14,7 +15,7 @@ from .media import ffmpeg
 from .face_engine import describe, portrait, best_match
 
 _lock = threading.RLock()
-VERSION = 'reference-v4-arcface'
+VERSION = 'reference-v5-dynamic-arcface'
 
 
 def reference(source, token):
@@ -118,7 +119,7 @@ def assemble(samples, cuts, clip, token):
             close=[p for p in group if abs((p['face'][0]+p['face'][2])/2-median)<.16]
             if len(close)>=math.ceil(len(group)*.7):group=close
         kind='selected' if group else 'uncertain'
-        reason='Theo chủ thể đã chọn; xác định lại vị trí trong góc máy này.' if group else 'Không thấy chắc chủ thể đã chọn: giữ một chân dung đã xác nhận, cần duyệt lại.'
+        reason='Theo chủ thể đã chọn; xác định lại vị trí trong góc máy này.' if group else 'Chưa nhận diện đủ chắc chủ thể ở góc máy này: giữ video đang chuyển động, cần duyệt lại.'
         scene={'start':a,'end':b,'kind':kind,'speaker':'Chủ thể đã chọn','reason':reason,'confidence':.9 if group else 0,'keyframes':[]}
         if group:
             accepted.extend(group)
@@ -128,15 +129,18 @@ def assemble(samples, cuts, clip, token):
         else:missing.append((a,b))
         scenes.append(scene)
     if not points:raise ValueError('Chưa tìm thấy chắc chủ thể trong clip. Chọn ảnh rõ mặt hơn và thử lại; không dựng crop vào giữa cảnh.')
-    holds=[]
+    fallbacks=[]
     for a,b in missing:
         prior=[p for p in accepted if p['time']<a]
         verified=prior[-1] if prior else accepted[0]
-        holds.append({'start':a,'end':b,'frame_time':verified['time'],'reference':True,'reason':'Giữ chân dung đã xác nhận khi chủ thể vắng mặt hoặc chưa chắc chắn.'})
+        # Keep the source moving during an ambiguous camera shot.  The last
+        # confirmed geometry is only an anchor for the crop, never a replacement
+        # JPEG; reviewers can still see the actual camera footage and subtitles.
+        fallbacks.append({'start':a,'end':b,'anchor_time':verified['time'],'reason':'Không đủ chắc chắn để đổi chủ thể; giữ chuyển động gốc với khung neo gần nhất.'})
         box=verified['face'];points.append({'time':a,'face':box,'x':(box[0]+box[2])/2,'mode':'crop','kind':'uncertain','scene':f'hold:{a}','cut':True})
     return {'version':VERSION,'start':clip['start'],'end':clip['end'],'subject':token,'reference_tracking':True,
-            'keyframes':sorted(points,key=lambda p:p['time']),'scenes':scenes,'visual_cuts':cuts,'reference_holds':holds,
-            'note':f'Theo chủ thể đã chọn qua từng góc máy. {len(missing)} cảnh cần duyệt (giữ ảnh chân dung, lời thoại tiếp tục).',
+            'keyframes':sorted(points,key=lambda p:p['time']),'scenes':scenes,'visual_cuts':cuts,'reference_holds':[], 'dynamic_fallbacks':fallbacks,
+            'note':f'Theo chủ thể đã chọn qua từng góc máy. {len(missing)} cảnh cần duyệt (video vẫn chuyển động, lời thoại tiếp tục).',
             'layout_version':'portrait-v5.1','geometry_version':'face-v9-arcface'}
 
 
@@ -199,17 +203,5 @@ def analyze(source, clip, progress):
 
 
 def hold_images(source,clip,plan):
-    """Explicit replacement stills shared by preview and render, including opening gaps."""
-    from . import focus
-    from .intro_art import freeze
-    clip={**clip,'settings':{**clip['settings'],'crop_mode':'auto'}}
-    directory=focus.cache_dir(source,clip)
-    for h in plan.get('holds',[]):
-        if not h.get('reference'):continue
-        path=directory/f'reference-hold-{h["frame_time"]:.5f}-{clip["settings"].get("crop_zoom",1)}.jpg'
-        if not path.exists():
-            import uuid
-            temp=path.with_name(uuid.uuid4().hex+'.jpg')
-            freeze(source,clip,clip['start']+h['frame_time'],temp);temp.replace(path)
-        h['path']=str(path.relative_to(config.DATA))
+    """Compatibility hook for cached callers; selected-subject plans never freeze."""
     return plan

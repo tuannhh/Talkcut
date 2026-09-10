@@ -4,6 +4,7 @@ import os
 import queue
 import shutil
 import threading
+import uuid
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from . import config, store, google_ai, editor
@@ -12,6 +13,12 @@ from .schemas import Settings, Word
 
 jobs = queue.Queue()
 submit_lock = threading.Lock()
+
+# A landscape 1080p source only has about 608 pixels across a 9:16 crop.  It
+# must then be enlarged to 1080px for the final video, which is visibly soft.
+# Prefer a 2160p MP4 stream when YouTube offers it, while retaining sensible
+# lower-resolution fallbacks for ordinary public videos.
+YOUTUBE_FORMAT = 'bv*[height<=2160][ext=mp4]+ba[ext=m4a]/bv*[height<=2160]+ba/b[height<=2160]'
 
 
 def enqueue(kind, target, payload=None):
@@ -55,7 +62,7 @@ def source_path(value):
     return path
 
 
-def finish_source(source, path, title=None):
+def finish_source(source, path, title=None, preserve_analysis=False):
     info = probe(path)
     if not info.get('width') or info['duration'] <= 0 or not info['has_audio']:
         raise ValueError('Nguồn phải là video có âm thanh và thời lượng hợp lệ.')
@@ -66,12 +73,45 @@ def finish_source(source, path, title=None):
     thumb = folder / 'thumbnail.jpg'
     frame(path, thumb, min(5, info['duration'] / 4))
     preview = path
-    if path.suffix.lower() not in ('.mp4', '.m4v') or info.get('codec') != 'h264':
+    # Chromium can play the MP4 streams selected above (H.264, VP9 or AV1).
+    # Keeping that original file for the editor avoids a 1280px proxy being
+    # cropped and enlarged again in the portrait preview.  A proxy remains a
+    # compatibility fallback for non-MP4 container uploads.
+    if path.suffix.lower() not in ('.mp4', '.m4v'):
         preview = folder / 'preview.mp4'
         ffmpeg(['-i', path, '-vf', 'scale=1280:1280:force_original_aspect_ratio=decrease:force_divisible_by=2',
                 '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-c:a', 'aac', '-b:a', '128k',
                 '-pix_fmt', 'yuv420p', '-movflags', '+faststart', preview])
-    return store.update(source['id'], path=str(path.relative_to(config.DATA)), preview_path=str(preview.relative_to(config.DATA)), thumbnail=str(thumb.relative_to(config.DATA)), status='ready', title=title or source['title'], **info)
+    status = 'analyzed' if preserve_analysis and source.get('transcript_ready') else 'ready'
+    return store.update(source['id'], path=str(path.relative_to(config.DATA)), preview_path=str(preview.relative_to(config.DATA)), thumbnail=str(thumb.relative_to(config.DATA)), status=status, title=title or source['title'], **info)
+
+
+def _youtube_download(source, progress, stem='original', preserve_analysis=False):
+    """Download a new source beside the previous one, only switching on success."""
+    import yt_dlp
+    folder = config.DATA / 'sources' / source['id']
+    url = youtube_url(source['input'])
+    def hook(d):
+        if d['status'] == 'downloading':
+            total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
+            if d.get('downloaded_bytes', 0) > config.MAX_BYTES:
+                raise ValueError('Nguồn YouTube vượt giới hạn dung lượng.')
+            percent = min(85, int(d.get('downloaded_bytes', 0) / total * 80)) if total else 20
+            progress('Đang tải video YouTube chất lượng cao', percent)
+    class QuietLogger:
+        def debug(self, msg): pass
+        def warning(self, msg): pass
+        def error(self, msg): pass
+    opts = {'outtmpl': str(folder / (stem + '.%(ext)s')), 'format': YOUTUBE_FORMAT,
+            'merge_output_format': 'mp4', 'noplaylist': True, 'max_filesize': config.MAX_BYTES, 'socket_timeout': 30,
+            'retries': 3, 'quiet': True, 'logger': QuietLogger(), 'progress_hooks': [hook],
+            'js_runtimes': {'node': {}}, 'cachedir': str(config.DATA / 'youtube-cache')}
+    with yt_dlp.YoutubeDL(opts) as dl:
+        info = dl.extract_info(url, download=True)
+    candidates = sorted((p for p in folder.glob(stem + '.*') if p.suffix.lower() in ('.mp4', '.mkv', '.webm')), key=lambda p:p.stat().st_mtime_ns, reverse=True)
+    if not candidates:
+        raise ValueError('Không tải được video. Link có thể yêu cầu đăng nhập; hãy upload file nguồn.')
+    return finish_source(source, candidates[0], info.get('title', source['title']), preserve_analysis=preserve_analysis)
 
 
 def import_source(source, progress):
@@ -83,30 +123,26 @@ def import_source(source, progress):
         target = folder / ('original' + path.suffix.lower())
         shutil.copyfile(path, target)
         return finish_source(source, target, path.name)
-    import yt_dlp
-    url = youtube_url(source['input'])
-    progress('Đang tải video YouTube', 10)
-    def hook(d):
-        if d['status'] == 'downloading':
-            total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
-            if d.get('downloaded_bytes', 0) > config.MAX_BYTES:
-                raise ValueError('Nguồn YouTube vượt giới hạn dung lượng.')
-            percent = min(85, int(d.get('downloaded_bytes', 0) / total * 80)) if total else 20
-            progress('Đang tải video YouTube', percent)
-    class QuietLogger:
-        def debug(self, msg): pass
-        def warning(self, msg): pass
-        def error(self, msg): pass
-    opts = {'outtmpl': str(folder / 'original.%(ext)s'), 'format': 'bv*[height<=1080]+ba/b[height<=1080]',
-            'merge_output_format': 'mp4', 'noplaylist': True, 'max_filesize': config.MAX_BYTES, 'socket_timeout': 30,
-            'retries': 3, 'quiet': True, 'logger': QuietLogger(), 'progress_hooks': [hook],
-            'js_runtimes': {'node': {}}, 'cachedir': str(config.DATA / 'youtube-cache')}
-    with yt_dlp.YoutubeDL(opts) as dl:
-        info = dl.extract_info(url, download=True)
-    candidates = [p for p in folder.glob('original.*') if p.suffix in ('.mp4', '.mkv', '.webm')]
-    if not candidates:
-        raise ValueError('Không tải được video. Link có thể yêu cầu đăng nhập; hãy upload file nguồn.')
-    return finish_source(source, candidates[0], info.get('title', source['title']))
+    progress('Đang chọn stream YouTube chất lượng cao', 10)
+    return _youtube_download(source, progress)
+
+
+def refresh_youtube_quality(source, progress):
+    if source.get('kind') != 'youtube':
+        raise ValueError('Chỉ có thể tải lại chất lượng cho nguồn YouTube.')
+    # Do not overwrite the working source.  Existing clips/transcripts continue
+    # to point at their previous input until the new file has been fully probed.
+    progress('Đang chọn stream 4K/2K từ YouTube', 5)
+    result = _youtube_download(source, progress, stem='quality-' + uuid.uuid4().hex, preserve_analysis=True)
+    # Generated card thumbnails are safe to refresh; transcript timing and clip
+    # settings deliberately remain untouched.
+    for clip in store.listing('clip'):
+        if clip.get('source_id') != source['id']:
+            continue
+        target = config.DATA / 'sources' / source['id'] / f"clip-{clip['id']}.jpg"
+        frame(config.DATA / result['path'], target, clip['start'])
+        store.update(clip['id'], thumbnail=str(target.relative_to(config.DATA)))
+    return result
 
 
 def transcript_segments(words):
@@ -207,6 +243,8 @@ def dispatch(job, progress):
     kind, id = job['kind'], job['target']
     if kind == 'import':
         return import_source(store.get(id, 'source'), progress)
+    if kind == 'refresh-quality':
+        return refresh_youtube_quality(store.get(id, 'source'), progress)
     if kind == 'analyze':
         return analyze(store.get(id, 'source'), job['payload'], progress)
     if kind == 'focus':

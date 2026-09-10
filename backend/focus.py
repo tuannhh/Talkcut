@@ -20,7 +20,7 @@ LABELS = {'selected':'Chủ thể đã chọn','speaker': 'Người đang nói',
 def cache_dir(source, clip):
     stat = Path(source).stat()
     identity = [VERSION, str(source), stat.st_size, stat.st_mtime_ns, clip['start'], clip['end'], config.CONTENT_MODEL]
-    if clip.get('settings',{}).get('tracking_subject'):identity += ['reference-v3',clip['settings']['tracking_subject']]
+    if clip.get('settings',{}).get('tracking_subject'):identity += ['reference-v5-dynamic',clip['settings']['tracking_subject']]
     key = hashlib.sha256(json.dumps(identity).encode()).hexdigest()[:32]
     return config.DATA / 'jobs' / ('focus-' + key)
 
@@ -391,12 +391,10 @@ def camera_points(track):
 
 def calm_holds(track,settings):
     if track.get('reference_tracking'):
-        required=[dict(h) for h in track.get('reference_holds',[])]
-        # Keep the existing measured same-voice pacing without letting an
-        # optional hold sample a required replacement or overlap its recovery.
-        optional=calm_holds({**track,'reference_tracking':False},settings)
-        optional=[h for h in optional if not any(h['start']<r['end']+2 and h['end']>r['start']-2 for r in required)]
-        return sorted(required+optional,key=lambda h:h['start'])
+        # Selected-subject tracking must keep actual source frames alive.  A
+        # visual hold looks like a frozen camera while audio/captions continue,
+        # which is worse than exposing an explicitly marked uncertain angle.
+        return []
     if not settings.get('calm_short_shots',True):return []
     scenes=track.get('scenes',[]);cuts=track.get('visual_cuts',[]);holds=[]
     limit=settings.get('calm_max_seconds',4)

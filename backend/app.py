@@ -159,6 +159,16 @@ def analyze(id: str, body: AnalyzeRequest):
     return pipeline.enqueue('analyze', id, body.model_dump())
 
 
+@app.post('/api/sources/{id}/refresh-quality')
+def refresh_source_quality(id: str):
+    source = store.get(id, 'source')
+    if source.get('kind') != 'youtube':
+        raise ValueError('Chỉ có nguồn YouTube mới có thể tải lại chất lượng.')
+    if source.get('status') not in ('ready', 'analyzed'):
+        raise ValueError('Chờ nhập nguồn hoàn tất trước khi tải lại chất lượng.')
+    return pipeline.enqueue('refresh-quality', id)
+
+
 @app.get('/api/clips/{id}')
 def get_clip(id: str):
     clip = store.get(id, 'clip')
@@ -314,10 +324,7 @@ def get_focus(id: str, zoom: float | None = Query(None, ge=1, le=2), subject: st
         settings=Settings.model_validate(clip.get('settings',{})).model_dump()
         plan=focusing.prepared_track(plan,source,settings)
         plan['holds']=focusing.calm_holds(plan,settings)
-        from .intro_art import freeze
         directory=focusing.cache_dir(config.DATA/source['path'],clip)
-        from .subject_tracking import hold_images
-        hold_images(config.DATA/source['path'],{**clip,'settings':settings},plan)
         for h in plan['holds']:
             if h.get('path'):continue
             path=directory/f'hold-v6-{h["frame_time"]:.3f}-{settings["crop_zoom"]}.jpg'

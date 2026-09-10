@@ -119,3 +119,19 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
   holds. Subject centers were stable around .51 in close shots and .80 in the
   right-hand wide angle; no fallback center/table geometry was emitted. The
   probe validates crop planning, not active-speaker identity from voice.
+
+## v0.9.0-rc.2 — high-resolution YouTube / no frozen reference frames — 2026-09-10
+
+- Queried the user-provided `https://www.youtube.com/watch?v=G5vFOYti6QA`:
+  it offers 3840×2160 AV1 alongside lower streams, while the prior TalkCut
+  record was 640×360 H.264.
+- Exercised the safe refresh endpoint against the existing source. It completed
+  as 3840×2160 AV1 (587,518,160 bytes), preserving `analyzed`, 5,241 transcript
+  words and existing clips; the old `original.mp4` remains in the volume.
+- Created a 15.034-second selected-subject Full-HD proof: 1080×1920 H.264/AAC,
+  8,874,880 bytes, `reference_holds=[]` and `holds=[]`. FFmpeg decoded the
+  complete MP4 without errors. Unit coverage also verifies no `movie=` still
+  replacement reaches a selected-subject render plan.
+- Final checks: 152 Python tests passed, Vite production build passed, and the
+  rebuilt Docker Studio service is healthy at `http://localhost:8092/`. This is
+  a release candidate pending user review, not a stable handoff.

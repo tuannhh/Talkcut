@@ -40,13 +40,14 @@ def test_reference_stays_on_right_in_wide_and_recenters_in_closeup():
     assert plan['visual_cuts']==[2]
 
 
-def test_reference_absence_holds_portrait_including_opening():
+def test_reference_absence_keeps_moving_source_video_including_opening():
     samples=[{'id':0,'shot':0,'time':.5,'face':None},{'id':1,'shot':1,'time':2.5,'face':[.7,.1,.85,.4]},
              {'id':2,'shot':2,'time':4.5,'face':None}]
     track=assemble(samples,[2,4],{'start':100,'end':106},'a'*24)
-    assert [(h['start'],h['end'],h['frame_time']) for h in track['reference_holds']]==[(0,2,2.5),(4,6,2.5)]
+    assert track['reference_holds']==[]
+    assert [(h['start'],h['end'],h['anchor_time']) for h in track['dynamic_fallbacks']]==[(0,2,2.5),(4,6,2.5)]
     plan=prepared_track(track,{'width':1920,'height':1080},Settings(crop_mode='auto',calm_short_shots=False).model_dump())
-    assert len(plan['holds'])==2
+    assert plan['holds']==[]
     assert all(p['x']>.7 for p in plan['keyframes'])
     with pytest.raises(ValueError):assemble([{'shot':0,'face':None}],[],{'start':0,'end':3},'a'*24)
 
@@ -82,21 +83,26 @@ def test_selected_draft_uses_auto_geometry_even_when_saved_manual(monkeypatch):
     assert c['settings']['crop_mode']=='manual'
 
 
-def test_missing_reference_does_not_disable_short_same_voice_holds():
+def test_reference_tracking_never_inserts_a_static_visual_hold():
     from backend.focus import calm_holds
     track={'reference_tracking':True,'start':0,'end':12,'visual_cuts':[2,3,8,9],
            'reference_holds':[{'start':8,'end':9,'frame_time':7,'reference':True}],
+           'keyframes':[{'time':0,'x':.5,'mode':'crop','scene':'camera:0'}],
            'speech_turns':[{'start':0,'end':12,'speaker':'1'}]}
-    holds=calm_holds(track,Settings().model_dump())
-    assert [(h['start'],h['end']) for h in holds]==[(2,3),(8,9)]
-    assert len(calm_holds(track,Settings(calm_short_shots=False).model_dump()))==1
+    assert calm_holds(track,Settings().model_dump())==[]
+    assert calm_holds(track,Settings(calm_short_shots=False).model_dump())==[]
+    from backend.transitions import transition_plan, visual_filters
+    plan=transition_plan(track,{'width':1920,'height':1080},Settings().model_dump())
+    assert plan['holds']==[]
+    assert 'movie=' not in visual_filters(plan,.65)
 
 
-def test_rejected_outlier_cannot_become_replacement_portrait():
+def test_rejected_outlier_keeps_a_dynamic_last_confirmed_crop():
     samples=[{'id':i,'shot':0,'time':i+.2,'face':[.7,.1,.8,.3] if i<3 else [.1,.1,.2,.3]} for i in range(4)]
     samples.append({'id':4,'shot':1,'time':4.2,'face':None})
     track=assemble(samples,[4],{'start':0,'end':6},'a'*24)
-    assert track['reference_holds'][0]['frame_time']==2.2
+    assert track['reference_holds']==[]
+    assert track['dynamic_fallbacks'][0]['anchor_time']==2.2
 
 
 def test_arcface_match_requires_a_clear_margin_over_other_faces():
@@ -104,6 +110,6 @@ def test_arcface_match_requires_a_clear_margin_over_other_faces():
     selected={'box':[.6,.1,.8,.4],'embedding':[.42]+[0.0]*511}
     listener={'box':[.1,.1,.3,.4],'embedding':[.30]+[0.0]*511}
     assert best_match(reference,[listener,selected]) is selected
-    # A close second face means the edit must hold a verified portrait rather
-    # than switching between interview participants.
+    # A close second face means the edit must abstain rather than switch
+    # between interview participants.
     assert best_match(reference,[selected,{**listener,'embedding':[.38]+[0.0]*511}]) is None

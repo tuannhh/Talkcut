@@ -331,9 +331,6 @@ def render(source, clip, words, settings, directory, progress):
     vf = crop_filter(info, settings, track)
     from .transitions import transition_plan,visual_filters
     pacing=transition_plan(track,info,settings)
-    if track and track.get('reference_tracking'):
-        from .subject_tracking import hold_images
-        hold_images(source,clip,pacing)
     vf += ','+visual_filters(pacing,settings.get('mix_seconds',.24))
     if settings['caption_enabled']:
         if not words:

@@ -76,3 +76,18 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
   use a verified portrait hold instead of moving the crop to a table,
   microphone or other guest.
 - Version checkpoints now capture Studio and face-engine images together.
+
+### v0.9.0-rc.2 — 2026-09-10
+
+- YouTube imports now prefer a 2160p MP4 video stream with M4A audio. Existing
+  YouTube sources can use “Tải lại bản sắc nét”: it downloads beside the old
+  file, probes before switching, retains transcript/settings and refreshes
+  generated thumbnails only.
+- Compatible MP4 media remains the editor preview rather than being reduced to
+  a 1280px proxy, preserving portrait crop detail.
+- Removed selected-subject portrait-JPEG replacement and automatic visual
+  holds. Ambiguous shots retain a crop anchor but the actual source footage,
+  speech and captions remain moving.
+- 152 Python tests and the Vite production build passed. The supplied test
+  source was refreshed from 640×360 to 3840×2160; a 15.034-second Full-HD
+  proof has no reference/visual holds and decodes successfully.

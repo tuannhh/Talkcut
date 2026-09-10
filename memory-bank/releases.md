@@ -41,3 +41,11 @@ and face-engine image, while media and SQLite remain in the existing volume.
 The first use downloads roughly 190 MB of ONNX models into that volume. No
 database migration or content-specific preset change. Await user review before
 stable promotion.
+
+### v0.9.0-rc.2 — high-resolution YouTube + moving fallback
+
+Candidate preserving `v0.9.0-rc.1` as the preceding rollback point. It prefers
+2160p YouTube streams and removes selected-subject portrait stills, so
+uncertain shots remain moving footage. Source replacement is additive: the
+old local file stays in the volume. No schema migration; await user review
+before stable promotion.
