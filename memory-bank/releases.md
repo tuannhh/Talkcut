@@ -64,6 +64,18 @@ clip-scoped portrait suggestion job using FFmpeg-decoded stills, avoiding the
 host OpenCV AV1 seek limitation. No SQLite migration; await user review before
 stable promotion.
 
+## v0.11.0-rc.1 — stacked two-frame composite
+
+Candidate preserving `v0.10.0-rc.1` as its rollback point. Adds AI-detected
+wide-two-person moments composited into a fixed top/bottom stacked frame with
+a gradient seam, gated to only those detected windows; everything else renders
+unchanged. New settings `tracking_subject_2`/`stacked_enabled`; no destructive
+migration. Validated with 169 Python tests (real ffmpeg, inside Docker), 8 JS
+tests, Docker/Vite builds, and a real-engine (SCRFD/ArcFace) probe against a
+semi-synthetic fixture built from real face crops — see VALIDATION.md. No
+probe against genuine unedited two-person camera footage yet; awaiting user
+review before stable promotion.
+
 ## v0.10.0-rc.1 — reference style candidate
 
 Dựng nhanh, reference-video templates and native-source tracking recovery.

@@ -17,6 +17,20 @@ test('direct sentence editing preserves anchors through replacement insertion de
  assert.equal(replaceTimedGroup(w,w.slice(1,3),'là công dân').map(x=>x.text).join(' '),'Tôi là công dân Việt');
 });
 
+test('stacked geometry keeps a tight bust crop inside the frame',async()=>{
+ const {stackedGeometry}=await import('./studio-helpers.mjs');
+ const g=stackedGeometry({width:1920,height:1080},{crop_zoom:1},[.05,.1,.2,.3]);
+ assert.ok(g.cw>0&&g.ch>0);
+ assert.ok(Math.abs(g.ch/g.cw-8/9)<.02);
+ assert.ok(g.x>=g.cw/2/1920&&g.x<=1-g.cw/2/1920);
+});
+test('stacked window lookup finds the active AI-chosen segment',async()=>{
+ const {stackedWindowAt}=await import('./studio-helpers.mjs');
+ const segments=[{start:1,end:2},{start:5,end:7}];
+ assert.equal(stackedWindowAt(segments,1.5),segments[0]);
+ assert.equal(stackedWindowAt(segments,3),null);
+ assert.equal(stackedWindowAt(segments,6),segments[1]);
+});
 test('fixed subject uses explicit source-time positions without interpolation',async()=>{
  const {staticCenter}=await import('./studio-helpers.mjs');
  const s={crop_x:.2,crop_y:.5,crop_locks:[{start:105,end:115,x:.8,y:.3}]};

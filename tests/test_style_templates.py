@@ -22,6 +22,13 @@ def test_reference_cannot_replace_content_or_select_another_subject(monkeypatch)
     assert not {'intro_text','tracking_subject','watermark_text'} & mapped_settings(p).keys()
 
 
+def test_stacked_layout_enables_the_toggle_but_never_picks_a_subject():
+    assert mapped_settings(profile(layout='stacked'))['stacked_enabled'] is True
+    assert mapped_settings(profile(layout='mixed'))['stacked_enabled'] is True
+    assert mapped_settings(profile(layout='portrait'))['stacked_enabled'] is False
+    assert not {'tracking_subject', 'tracking_subject_2'} & mapped_settings(profile(layout='stacked')).keys()
+
+
 def test_reference_validation_and_failed_profile(monkeypatch):
     for options in ({'caption_font':'../../bad'},{'caption_y':float('nan')},{'mix_seconds':99},{'sound_effect':'shell command'}):
         with pytest.raises(ValueError):profile(**options)

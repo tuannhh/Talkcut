@@ -123,6 +123,8 @@ class Settings(BaseModel):
     crop_y: float = Field(default=.5, ge=0, le=1)
     crop_locks: list[CropLock] = Field(default_factory=list, max_length=300)
     tracking_subject: str | None = Field(default=None, pattern=r'^[a-f0-9]{24}$')
+    tracking_subject_2: str | None = Field(default=None, pattern=r'^[a-f0-9]{24}$')
+    stacked_enabled: bool = False
     intro_title_font: Literal['DejaVu Sans','Google Sans','Open Sans','Barlow','Roboto'] = 'DejaVu Sans'
     crop_x: float = Field(default=0.5, ge=0, le=1)
     crop_zoom: float = Field(default=1.0, ge=1, le=2)

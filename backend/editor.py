@@ -337,6 +337,11 @@ def render(source, clip, words, settings, directory, progress):
     from .transitions import transition_plan,visual_filters
     pacing=transition_plan(track,info,settings)
     vf += ','+visual_filters(pacing,settings.get('mix_seconds',.24))
+    if settings.get('stacked_enabled') and settings.get('tracking_subject') and settings.get('tracking_subject_2'):
+        from .stacked_view import detect as detect_stacked, wrap as wrap_stacked
+        stacked = detect_stacked(source, clip, progress)
+        if stacked['segments']:
+            vf = wrap_stacked(vf, stacked['segments'], info, settings)
     if settings['caption_enabled'] or settings.get('main_title_enabled'):
         if settings['caption_enabled'] and not words:
             raise ValueError('Chưa có transcript. Phân tích nguồn trước hoặc tắt phụ đề.')

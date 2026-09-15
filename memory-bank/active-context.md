@@ -176,3 +176,71 @@ v0.10.0-rc.1 remains pending user acceptance; stacked/B-roll/complex animated
 composition is still not implemented. Do not describe template learning as full
 reconstruction. User requested finishing interrupted work; browser file chooser
 hung previously, so reference uploads were verified through API instead.
+
+## v11 — stacked two-frame composite — 2026-09-15 (candidate)
+
+User asked to implement the "stacked" part of the still-unimplemented v10
+observations first (B-roll and complex motion stay unimplemented/out of scope
+for this request). Two new sample TikTok clips were inspected frame-by-frame
+(via OpenCV, no ffmpeg on this Windows host): the stacked reference keeps one
+person on top and the other on bottom for its entire 145s duration regardless
+of who is talking, not swapped per speaking turn. Given that evidence, the
+implementation uses a **fixed top/bottom assignment by chosen face**, not a
+per-moment speaker/listener swap — a deliberate simplification from the user's
+literal wording ("người nói và người nghe"), chosen to avoid fragile
+cross-modal (visual identity ↔ audio diarization) speaker attribution the
+project's own conventions warn against inventing. This was not re-confirmed
+with the user before implementing; flag it for review.
+
+Added `backend/stacked_view.py`: reuses the existing SCRFD/ArcFace engine and
+per-shot sampling pattern from `subject_tracking.py`. A shot counts as a
+"cảnh toàn" (wide two-person shot) only when both selected faces are
+confidently matched simultaneously AND both are small/separated enough
+(`wide_two_shot`, pure geometry, no new Gemini call). Qualifying shots get one
+locked representative crop per person (`half_geometry`, a tighter 9:8 bust
+crop than the normal single-subject crop). Render (`stacked_view.wrap`) adds a
+parallel FFmpeg branch — split the original frame, crop each half, `vstack`,
+blend a soft dark gradient across the seam, overlay onto the existing
+crop/Mix output only during detected windows (`enable=between(t,a,b)`) — audio
+and caption timing are untouched, same principle as the existing Mix. New
+schema fields `tracking_subject_2` (bottom person) and `stacked_enabled`
+(opt-in toggle). `style_templates.py`'s previously-inert `profile.layout`
+field now sets `stacked_enabled` when a learned reference used a
+stacked/mixed layout (still never selects a subject/identity).
+
+Frontend: `QuickEditor` step 1 gained a "Ghép khung chồng khi quay cảnh toàn"
+toggle, a second `TrackingSubjects` picker (bottom person), and a prepare
+button calling new `POST/GET /clips/{id}/stacked`. `MotionPreview` and
+`studio-helpers.mjs` (`stackedGeometry`, `stackedWindowAt`) mirror the backend
+math for a matching live preview, using a canvas gradient instead of the
+backend's generated PNG (no shared asset dependency needed for preview).
+
+The fixed-position design was explicitly confirmed with the user afterward:
+they agreed it matches the reference video's actual behaviour, and separately
+re-emphasized the OTHER core requirement — stacking must only replace the
+close-up crop during AI-detected wide/two-person moments, never for a whole
+clip, and a clip with no qualifying wide shot must render exactly as before.
+That was already the implemented design (`wide_two_shot` + `assemble`'s
+per-shot qualification + `wrap`'s `enable=between(...)` gating), so no code
+change was needed from that confirmation.
+
+Docker (freshly reinstalled by the user this session) came up after a machine
+restart. Full validation: 169 Python tests pass **inside the `studio`
+container with real ffmpeg** (previously 10 of these could only run natively
+on Windows with ffmpeg absent), 8 JS tests, Vite and Docker builds. A
+semi-synthetic real-engine probe (real face crops from the two reference
+videos, composited into a 12s fixture with a genuine wide-two-shot segment)
+proved the full pipeline end-to-end through the real SCRFD/ArcFace engine and
+real FFmpeg render: gallery scan found both distinct faces; stacked detection
+returned exactly the constructed `[3.0, 9.0]` window with correct top/bottom
+tokens and no false positive on the two close-up thirds; the rendered export
+showed a clean hard-cut into a correctly stacked, gradient-seamed composite
+exactly at the window boundary, and ordinary single-crop framing outside it.
+See `VALIDATION.md` (`v0.11.0-rc.1`) for full detail and remaining limits —
+notably, no genuine (non-synthetic) two-person camera footage was available
+on this machine to probe, and `half_geometry`'s bust-crop headroom constants
+still await a visual pass against real frontal (not just profile) footage.
+Test data was created and then fully deleted from the Docker volume; it holds
+no leftover clips/sources from this probe. Not yet done: browser/UI
+verification of the new QuickEditor controls and live preview, and a
+multi-minute render combining captions with the stacked composite.

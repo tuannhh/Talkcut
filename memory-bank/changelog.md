@@ -126,3 +126,34 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
 - Verified both supplied references, actual background gallery completion across
   panel navigation, template draft application and a decoded 22-second Full-HD
   proof. 159 Python + 6 JS tests pass. See VALIDATION.md for limits and evidence.
+
+## 2026-09-15 — v0.11.0-rc.1
+
+- New `backend/stacked_view.py`: AI-detected "cảnh toàn" (wide, two-person)
+  moments are composited into a stacked two-frame portrait — one selected
+  person locked top, the other locked bottom, position fixed for the whole
+  clip rather than swapped by who is speaking (a deliberate, user-confirmed
+  simplification; see active-context.md). Detection is pure geometry over the
+  existing SCRFD/ArcFace engine (both selected faces confidently matched,
+  small and horizontally separated) — no new Gemini call. Qualifying shots
+  get one locked bust crop per person; non-qualifying shots (close-ups) are
+  untouched.
+- Render (`stacked_view.wrap`) adds a parallel FFmpeg branch off the original
+  frame — crop each half, `vstack`, blend a soft gradient across the seam,
+  overlay onto the existing crop/Mix output only during detected windows.
+  Audio and caption timing are unaffected, same principle as the existing Mix.
+- New schema fields `tracking_subject_2` (bottom person) and `stacked_enabled`
+  (opt-in toggle). `style_templates.py`'s previously inert `profile.layout`
+  field now sets `stacked_enabled` when a learned reference used a
+  stacked/mixed layout; it still never selects a subject/identity.
+- Frontend: QuickEditor gained a stacking toggle, a second subject picker for
+  the bottom person, and a prepare button; MotionPreview and
+  `studio-helpers.mjs` mirror the backend geometry for a matching live
+  preview using a canvas gradient.
+- 169 Python tests (10 new) pass inside Docker with a real ffmpeg, including a
+  real-FFmpeg pixel test of the stacked filter graph; 8 JS tests; Vite and
+  Docker builds pass. A semi-synthetic real-engine probe (real face crops
+  composited into a fixture with a genuine wide-two-shot window) proved
+  detection and render end-to-end: exactly the constructed window was found
+  and correctly stacked with a clean cut at its boundary. See VALIDATION.md.
+  B-roll and complex-motion-layer reproduction remain unimplemented, as before.

@@ -47,6 +47,21 @@ export function replaceTimedGroup(words,group,text){
  return [...words.slice(0,first),...editTimedGroup(group,text),...words.slice(first+group.length)];
 }
 
+// Mirrors backend/stacked_view.py::half_geometry so the live preview matches export.
+export function stackedGeometry(info,settings,face){
+ const iw=info.width,ih=info.height,z=Math.min(2,(settings.crop_zoom||1)*1.45);
+ const cw=Math.max(2,Math.floor(Math.min(iw,ih*9/16)/z/2)*2),ch=Math.max(2,Math.floor(cw*8/9/2)*2);
+ const [x1,y1,x2,y2]=face,fw=x2-x1,fh=y2-y1;
+ const left=Math.max(0,x1-fw*.15),right=Math.min(1,x2+fw*.15),top=Math.max(0,y1-fh*.45),bottom=Math.min(1,y2+fh*.9);
+ let cx,cy;
+ if((right-left)*iw>cw||(bottom-top)*ih>ch){cx=clamp((x1+x2)/2,cw/iw/2,1-cw/iw/2);cy=clamp((y1+y2)/2,ch/ih/2,1-ch/ih/2);}
+ else{cx=clamp((x1+x2)/2,right-cw/iw/2,left+cw/iw/2);cy=clamp((y1+y2)/2+ch/ih*.12,bottom-ch/ih/2,top+ch/ih/2);}
+ const x=clamp(cx*iw-cw/2,0,iw-cw),y=clamp(cy*ih-ch/2,0,ih-ch);
+ return {x:(x+cw/2)/iw,y:(y+ch/2)/ih,cw,ch};
+}
+export function stackedWindowAt(segments,time){
+ return (segments||[]).find(s=>time>=s.start&&time<s.end)||null;
+}
 export function staticCenter(settings,time){
  const lock=[...(settings.crop_locks||[])].reverse().find(r=>r.start<=time&&time<r.end);
  return {x:lock?.x??settings.crop_x??.5,y:lock?.y??settings.crop_y??.5};

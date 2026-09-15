@@ -195,3 +195,55 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
   observations, explicitly labelled as not automatically reconstructed. These
   require further implementation; this candidate is not a complete imitation
   engine or an accepted stable handoff.
+
+## v0.11.0-rc.1 — stacked two-frame composite — 2026-09-15
+
+- Environment: Windows 10, Docker Desktop (freshly reinstalled this session),
+  containers `talkcut-studio-studio:latest` and `talkcut-face-engine:latest`
+  built from a clean image cache. `docker compose up -d --build` succeeded;
+  both containers reported `healthy`.
+- Full backend suite run inside the `studio` container (real `ffmpeg` present,
+  unlike this Windows host natively): **169 Python tests passed**, including
+  the new real-FFmpeg pixel test for the stacked filter graph
+  (`test_stacked_composite_shows_both_halves_with_a_seam_only_inside_the_window`,
+  skipped on the bare Windows host for lack of `ffmpeg`, executed for real
+  here). 8 JavaScript tests pass; `npm run build` (Vite) passes.
+- Real-media, real-engine probe (no source video with an actual two-person
+  wide shot was available on this machine, so a semi-synthetic 12-second
+  1920×1080 fixture was built from real face crops taken from the two
+  supplied reference videos — one visibly-distinct background per intended
+  segment so the existing camera-cut detector could actually separate them:
+  0–3s close-up of person A, 3–9s both faces small and side-by-side ("cảnh
+  toàn"), 9–12s close-up of person B):
+  - The real SCRFD+ArcFace face-engine correctly detected and distinguished
+    both people from a plain subject-gallery scan (2 distinct candidates).
+  - Real stacked-view detection (`POST /clips/{id}/stacked/scan`) returned
+    exactly one segment, `[3.0, 9.0]`, matching the constructed wide-shot
+    window exactly, with the correct top/bottom subject tokens — the two
+    close-up thirds were correctly excluded (no false positive).
+  - A full render (captions off; the fixture's audio is silent, so no
+    transcript exists) produced a real 1080×1920 H.264/AAC export. Frames
+    extracted with `ffmpeg -ss ... -frames:v 1`: at 1.5s (before the window)
+    the ordinary single-crop/fit framing is shown; at 6.0s (inside the
+    window) both faces appear, correctly stacked top/bottom with a visible
+    dark gradient band at the seam; at 2.9s vs 3.1s the transition into the
+    stacked composite is an immediate, clean cut with no artifact. Outside
+    the window at 10.5s, the primary single-subject crop falls back to its
+    last confirmed anchor because the tracked top subject has left frame —
+    this is the pre-existing `dynamic_fallbacks` behaviour of
+    `subject_tracking.py`, unrelated to and unmodified by this feature.
+  - All synthetic sources/clips/exports/jobs and their media were deleted
+    from the Docker volume afterward; the volume was empty before and after
+    this probe.
+- Not yet done: a probe against genuine unedited camera footage (this
+  session had no such source with a real two-person wide shot available);
+  browser/UI verification of the new QuickEditor controls and the live
+  MotionPreview compositing; a full multi-minute end-to-end render with a
+  real transcript/captions alongside the stacked composite. The exact
+  headroom/margin constants in `half_geometry` are tuned by formula, not by
+  eye, against real diverse (frontal, not just profile) footage — the one
+  real render available here used profile-angle reference photos, so the
+  bust-crop framing may need a follow-up visual pass once real two-person
+  source video is available.
+- Not a stable handoff. See `memory-bank/active-context.md` (v11) for the
+  fixed top/bottom design decision and its rationale.

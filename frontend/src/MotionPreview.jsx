@@ -1,7 +1,7 @@
 import React,{useRef,useEffect} from 'react';
-import {focusAt,focusGeometry,staticCenter} from './studio-helpers.mjs';
+import {focusAt,focusGeometry,staticCenter,stackedGeometry,stackedWindowAt} from './studio-helpers.mjs';
 
-export function MotionPreview({video,clip,plan,points,info,media}){
+export function MotionPreview({video,clip,plan,points,info,media,stacked}){
  const canvas=useRef();const s=clip.settings;
  useEffect(()=>{
   const v=video.current;if(!v||!s.sound_effect||s.sound_effect==='none')return;
@@ -41,11 +41,21 @@ export function MotionPreview({video,clip,plan,points,info,media}){
    ctx.globalAlpha=1;ctx.drawImage(frame,0,0);
    if(outgoing&&cut!==null){const duration=Math.min(s.mix_seconds,(cuts[cutIndex+1]-cut)*.8||s.mix_seconds);ctx.globalAlpha=Math.max(0,1-(t-cut)/duration);ctx.drawImage(outgoing,0,0);ctx.globalAlpha=1;}
    previous=frame;
+   // Drawn last, like the export overlay: replaces whatever crop/mix showed above.
+   const window=s.stacked_enabled?stackedWindowAt(stacked,t):null;
+   if(window){
+    const half=H/2;
+    const drawHalf=(face,y0)=>{const g=stackedGeometry(info,s,face);const cw=g.cw/info.width*v.videoWidth,ch=g.ch/info.height*v.videoHeight,x=Math.max(0,Math.min(v.videoWidth-cw,g.x*v.videoWidth-cw/2)),y=Math.max(0,Math.min(v.videoHeight-ch,g.y*v.videoHeight-ch/2));ctx.drawImage(v,x,y,cw,ch,0,y0,W,half);};
+    drawHalf(window.box_top,0);drawHalf(window.box_bottom,half);
+    const seam=ctx.createLinearGradient(0,half-40,0,half+40);
+    seam.addColorStop(0,'rgba(8,10,14,0)');seam.addColorStop(.5,'rgba(8,10,14,.85)');seam.addColorStop(1,'rgba(8,10,14,0)');
+    ctx.fillStyle=seam;ctx.fillRect(0,half-40,W,80);
+   }
   }
   const refresh=()=>{last=-1;draw();};const tick=()=>{draw();frameId=v.requestVideoFrameCallback(tick);};
   v.addEventListener('seeked',refresh);v.addEventListener('loadeddata',refresh);v.addEventListener('timeupdate',draw);
   draw();if(v.requestVideoFrameCallback)frameId=v.requestVideoFrameCallback(tick);
   return()=>{disposed=true;if(frameId)v.cancelVideoFrameCallback(frameId);v.removeEventListener('seeked',refresh);v.removeEventListener('loadeddata',refresh);v.removeEventListener('timeupdate',draw);};
- },[clip.id,clip.start,clip.end,plan,points,s.crop_mode,s.crop_x,s.crop_y,JSON.stringify(s.crop_locks),s.crop_zoom,s.calm_short_shots,s.mix_seconds,info.width,info.height]);
+ },[clip.id,clip.start,clip.end,plan,points,s.crop_mode,s.crop_x,s.crop_y,JSON.stringify(s.crop_locks),s.crop_zoom,s.calm_short_shots,s.mix_seconds,s.stacked_enabled,JSON.stringify(stacked),info.width,info.height]);
  return <canvas ref={canvas} className="motion-preview" aria-label="Xem trước crop ổn định và chuyển cảnh hòa trộn"/>;
 }

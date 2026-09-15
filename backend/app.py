@@ -424,6 +424,26 @@ def scan_subject_gallery(id: str, refresh: bool = False):
     return pipeline.enqueue('subject-gallery',id,{'refresh':refresh})
 
 
+@app.get('/api/clips/{id}/stacked')
+def get_stacked(id: str):
+    from .stacked_view import cache_dir
+    clip=store.get(id,'clip');source=store.get(clip['source_id'],'source')
+    settings=clip.get('settings',{});top,bottom=settings.get('tracking_subject'),settings.get('tracking_subject_2')
+    if not top or not bottom:
+        return {'segments':None}
+    cache=cache_dir(config.DATA/source['path'],clip,top,bottom)/'stacked.json'
+    return {'segments':json.loads(cache.read_text())['segments'] if cache.exists() else None}
+
+
+@app.post('/api/clips/{id}/stacked/scan')
+def scan_stacked(id: str):
+    clip=store.get(id,'clip')
+    settings=clip.get('settings',{})
+    if not settings.get('tracking_subject') or not settings.get('tracking_subject_2'):
+        raise ValueError('Hãy chọn cả hai chủ thể (trên và dưới) trước khi ghép khung.')
+    return pipeline.enqueue('stacked-view',id,{})
+
+
 @app.post('/api/clips/{id}/focus')
 def prepare_focus(id: str):
     clip = store.get(id, 'clip')

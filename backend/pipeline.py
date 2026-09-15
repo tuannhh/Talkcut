@@ -260,6 +260,10 @@ def dispatch(job, progress):
     if kind == 'style-template':
         from .style_templates import analyze as analyze_style
         return analyze_style(store.get(id,'style-template'),progress)
+    if kind == 'stacked-view':
+        from .stacked_view import detect
+        clip=store.get(id,'clip');source=store.get(clip['source_id'],'source')
+        return detect(config.DATA/source['path'],clip,progress)
     if kind == 'render':
         clip = job['payload']['clip']
         source = store.get(clip['source_id'], 'source')

@@ -2,7 +2,7 @@ import React,{useState,useEffect,useRef} from 'react';
 import {TrackingSubjects} from './TrackingSubjects.jsx';
 import {PresetBar} from './PresetBar.jsx';
 
-export function QuickEditor({clip,api,post,media,jobs,notify,onApply,onSubject,onPanel,setting,plan,onPrepare,busy}){
+export function QuickEditor({clip,api,post,media,jobs,notify,onApply,onSubject,onSecondSubject,onPanel,setting,plan,stacked,onPrepare,onPrepareStacked,busy}){
  const [templates,setTemplates]=useState([]),[uploading,setUploading]=useState(false),[selected,setSelected]=useState(''),[applying,setApplying]=useState(false);
  const input=useRef(),currentClip=useRef(clip.id);currentClip.current=clip.id;
  useEffect(()=>{setSelected('');},[clip.id]);
@@ -17,6 +17,8 @@ export function QuickEditor({clip,api,post,media,jobs,notify,onApply,onSubject,o
  async function apply(item){if(applying)return;const id=clip.id;setApplying(true);try{const r=await post('/style-templates/'+item.id+'/apply',clip.settings);if(currentClip.current!==id)return;await onApply(r.settings);if(currentClip.current!==id)return;setSelected(item.id);notify('Đã áp dụng phong cách dựng cho clip này.');}catch(e){notify(e.message,true);}finally{setApplying(false);}}
  const focusJob=jobs.find(j=>j.kind==='focus'&&j.target===clip.id);
  const pending=['queued','running'].includes(focusJob?.status);
+ const stackedJob=jobs.find(j=>j.kind==='stacked-view'&&j.target===clip.id);
+ const stackedPending=['queued','running'].includes(stackedJob?.status);
  return <div className="quick-editor">
   <div className="quick-intro"><h3>Dựng clip trong vài bước</h3><p>Chọn người, chọn phong cách. Xem bên trái rồi xuất video.</p></div>
   <section className="quick-step"><div className="quick-step-title"><span>1</span><h3>Giữ ai trong khung hình?</h3></div>
@@ -25,6 +27,15 @@ export function QuickEditor({clip,api,post,media,jobs,notify,onApply,onSubject,o
    {focusJob?.status==='failed'&&<p role="alert">{focusJob.error}</p>}
    {!pending&&clip.settings.tracking_subject&&<div className="quick-tracking-state"><p>{plan?'✓ Đã có khung hình theo chủ thể':'Chủ thể đã chọn — chuẩn bị khung hình để xem.'}</p><button disabled={busy} onClick={onPrepare}>{plan?'Cập nhật tracking':'Chuẩn bị khung hình'}</button></div>}
    <button className="text-action" onClick={()=>onPanel('framing')}>Chỉnh crop hoặc kiểm tra từng cảnh</button>
+   <label className="quick-checkbox"><input type="checkbox" checked={!!clip.settings.stacked_enabled} disabled={busy} onChange={e=>setting('stacked_enabled',e.target.checked)}/>Ghép khung chồng khi quay cảnh toàn hai người</label>
+   {clip.settings.stacked_enabled&&<>
+    <p className="helper">Người ở bước 1 giữ vị trí trên. Chọn thêm người sẽ đứng dưới; AI sẽ tự tìm các đoạn cảnh toàn thấy rõ cả hai để ghép khung, cảnh khác giữ khung đơn như bình thường.</p>
+    {!clip.settings.tracking_subject&&<p role="status">Chọn người ở bước trên trước.</p>}
+    <TrackingSubjects clip={clip} api={api} media={media} jobs={jobs} onSelect={onSecondSubject} disabled={busy||stackedPending} field="tracking_subject_2" title="Chọn người đứng dưới" helper="Chọn một khuôn mặt khác với người ở trên." selectedHelper="Đã chọn người đứng dưới cho khung ghép."/>
+    {stackedPending&&<div className="quick-progress" role="status"><p>{stackedJob.message}</p><progress max="100" value={stackedJob.progress}/></div>}
+    {stackedJob?.status==='failed'&&<p role="alert">{stackedJob.error}</p>}
+    {!stackedPending&&clip.settings.tracking_subject&&clip.settings.tracking_subject_2&&<div className="quick-tracking-state"><p>{stacked?`✓ Đã tìm thấy ${stacked.length} đoạn để ghép khung`:'Đã chọn cả hai người — chuẩn bị để AI tìm đoạn ghép khung.'}</p><button disabled={busy} onClick={onPrepareStacked}>{stacked?'Tìm lại đoạn ghép khung':'Chuẩn bị ghép khung'}</button></div>}
+   </>}
   </section>
   <section className="quick-step"><div className="quick-step-title"><span>2</span><h3>Chọn phong cách dựng</h3></div>
    <p className="helper">Học từ clip bạn thích, dùng lại cho các video sau.</p>

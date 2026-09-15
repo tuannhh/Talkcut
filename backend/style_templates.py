@@ -34,9 +34,11 @@ class StyleProfile(BaseModel):
 
 def mapped_settings(profile):
     # Never import content, logos, identities or media from a reference.
+    # layout only toggles the stacked-composite behaviour; it never selects
+    # which local subject plays which role, so identity stays untouched.
     keys=('caption_size','caption_words','caption_y','caption_color','caption_font',
           'caption_box','caption_karaoke','mix_seconds','main_title_enabled','main_title_seconds','main_title_color','sound_effect')
-    return {**{key:getattr(profile,key) for key in keys},'caption_enabled':True}
+    return {**{key:getattr(profile,key) for key in keys},'caption_enabled':True,'stacked_enabled':profile.layout in ('stacked','mixed')}
 
 
 def analyze(item, progress):
@@ -67,8 +69,11 @@ sound_effect chỉ chọn pop/ding/whoosh khi nghe rõ hiệu ứng mở đầu 
     profile=StyleProfile.model_validate(google_ai.generate(prompt,[google_ai.media_part(proxy,'video/mp4')]))
     settings=mapped_settings(profile)
     Settings.model_validate(settings)
-    notes=['Chữ nhấn mở đầu dùng tiêu đề clip mới; hiệu ứng âm thanh là âm tổng hợp tương tự, không sao chép âm gốc.',
-           'Chia màn hình, cảnh minh họa, mood nhạc và các lớp chữ động phức tạp được ghi nhận; chưa tự tái dựng các lớp này.']
+    notes=['Chữ nhấn mở đầu dùng tiêu đề clip mới; hiệu ứng âm thanh là âm tổng hợp tương tự, không sao chép âm gốc.']
+    if profile.layout in ('stacked','mixed'):
+        notes.append('Đã bật ghép khung chồng cho clip này; chọn thêm chủ thể thứ hai (người dưới) rồi quét lại để AI tìm các đoạn cảnh toàn đủ hai người và tự ghép khung. Cảnh minh họa và chuyển động phức tạp trong mẫu vẫn chỉ được ghi nhận, chưa tự tái dựng.')
+    else:
+        notes.append('Chia màn hình, cảnh minh họa và các lớp chữ động phức tạp được ghi nhận; chưa tự tái dựng các lớp này.')
     result=store.update(item['id'],status='ready',profile=profile.model_dump(),settings=settings,
                         thumbnail=str(thumb.relative_to(config.DATA)),limits=notes)
     progress('Đã lưu mẫu dựng; có thể áp dụng cho clip khác',95)
