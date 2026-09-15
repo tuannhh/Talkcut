@@ -2,6 +2,11 @@
 """Local version checkpoints and non-destructive application rollback."""
 import argparse,json,os,re,subprocess,sys,datetime
 from pathlib import Path
+# Windows terminals default to a non-UTF-8 codepage that cannot print the
+# Vietnamese status messages below; force UTF-8 so the checkpoint work above
+# (already done by this point) is not hidden behind a crash on the last print.
+try:sys.stdout.reconfigure(encoding='utf-8');sys.stderr.reconfigure(encoding='utf-8')
+except Exception:pass
 ROOT=Path(__file__).resolve().parents[1]
 RELEASES=ROOT/'.releases'
 
