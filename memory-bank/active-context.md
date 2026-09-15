@@ -177,7 +177,7 @@ composition is still not implemented. Do not describe template learning as full
 reconstruction. User requested finishing interrupted work; browser file chooser
 hung previously, so reference uploads were verified through API instead.
 
-## v11 — stacked two-frame composite — 2026-09-15 (candidate)
+## v11 — stacked two-frame composite — 2026-09-15 (accepted stable, v0.11.0)
 
 User asked to implement the "stacked" part of the still-unimplemented v10
 observations first (B-roll and complex motion stay unimplemented/out of scope
@@ -244,3 +244,28 @@ Test data was created and then fully deleted from the Docker volume; it holds
 no leftover clips/sources from this probe. Not yet done: browser/UI
 verification of the new QuickEditor controls and live preview, and a
 multi-minute render combining captions with the stacked composite.
+
+After that, the user ran the app themselves with a real 23-minute 4K
+(3840×2160) YouTube source ("AIforAi#01…") and 4 real clips (148–298s each):
+real subject-gallery scans, real focus/selected-subject tracking, and a real
+stacked-view detection job all completed successfully through the browser UI.
+They asked about processing speed feeling slow. Diagnosis: the face-engine's
+ONNX sessions are CPU-only (`onnxruntime-node`, no GPU execution provider
+configured) and hard-limited to `FACE_ENGINE_WORKERS=2` workers of
+`intraOpNumThreads:1` each; `RENDER_THREADS` defaulted to 4 — on this
+particular machine (20 CPUs, 62 GB RAM, an idle NVIDIA GPU with CUDA 12.6 and
+the `nvidia` Docker runtime already available), that leaves most of the
+hardware unused. Bumped this machine's `.env` to `FACE_ENGINE_WORKERS=6` and
+`RENDER_THREADS=12` and recreated the two containers (no job was running; all
+data survived). GPU acceleration for the face-engine was raised as a bigger,
+separate follow-up (real onnxruntime/CUDA-driver compatibility work, not
+attempted) — not done, offered but not requested yet.
+
+The user then reviewed the resulting behavior and explicitly accepted this
+build as stable: "Bản này tôi thấy là ổn rồi" (this version looks good to
+me). Promoted via `scripts/versions.py checkpoint v0.11.0 --accepted`,
+which also fixed a pre-existing Windows-only crash in that script itself
+(Vietnamese console output crashed on Windows' default codepage after the
+real checkpoint work had already completed — cosmetic only, fixed by forcing
+UTF-8 stdout/stderr). This is the first version in this project accepted as
+stable — see `releases.md` for the checkpoint record and rollback command.

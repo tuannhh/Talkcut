@@ -64,17 +64,37 @@ clip-scoped portrait suggestion job using FFmpeg-decoded stills, avoiding the
 host OpenCV AV1 seek limitation. No SQLite migration; await user review before
 stable promotion.
 
-## v0.11.0-rc.1 — stacked two-frame composite
+## v0.11.0 — stacked two-frame composite (stable, accepted)
 
-Candidate preserving `v0.10.0-rc.1` as its rollback point. Adds AI-detected
-wide-two-person moments composited into a fixed top/bottom stacked frame with
-a gradient seam, gated to only those detected windows; everything else renders
-unchanged. New settings `tracking_subject_2`/`stacked_enabled`; no destructive
-migration. Validated with 169 Python tests (real ffmpeg, inside Docker), 8 JS
-tests, Docker/Vite builds, and a real-engine (SCRFD/ArcFace) probe against a
-semi-synthetic fixture built from real face crops — see VALIDATION.md. No
-probe against genuine unedited two-person camera footage yet; awaiting user
-review before stable promotion.
+Adds AI-detected wide-two-person moments composited into a fixed top/bottom
+stacked frame with a gradient seam, gated to only those detected windows;
+everything else renders unchanged. New settings `tracking_subject_2`/
+`stacked_enabled`; no destructive migration. Validated with 169 Python tests
+(real ffmpeg, inside Docker), 8 JS tests, Docker/Vite builds, a real-engine
+(SCRFD/ArcFace) probe against a semi-synthetic fixture built from real face
+crops, and then real day-to-day use by the user against a real 23-minute 4K
+source and 4 real clips (subject gallery, tracking, stacked detection all run
+through the browser). See VALIDATION.md.
+
+User accepted this build as stable ("Bản này tôi thấy là ổn rồi") after also
+having `FACE_ENGINE_WORKERS`/`RENDER_THREADS` tuned up for this machine's
+20-core/62 GB hardware (local `.env` only, not part of the image). Checkpoint
+created with `scripts/versions.py checkpoint v0.11.0 --accepted`: git tag
+`v0.11.0`, images `talkcut-studio:v0.11.0` / `talkcut-face-engine:v0.11.0`,
+SQLite snapshot `/data/checkpoints/v0.11.0.sqlite`. `v0.10.0-rc.1` remains the
+prior candidate checkpoint below it for reference; rollback before this point
+would lose the stacked-view feature entirely. This is the first version in
+this project accepted as stable rather than left as a review candidate.
+
+Still not implemented / not yet probed with genuine (non-synthetic)
+two-person camera footage: B-roll and complex-motion-layer reproduction from
+reference styles, and GPU acceleration for the face-engine (raised as a
+follow-up, not started).
+
+## v0.11.0-rc.1 — stacked two-frame composite (superseded by v0.11.0 above)
+
+Candidate preserving `v0.10.0-rc.1` as its rollback point. Superseded the same
+day by the accepted `v0.11.0` once the user reviewed and confirmed it.
 
 ## v0.10.0-rc.1 — reference style candidate
 

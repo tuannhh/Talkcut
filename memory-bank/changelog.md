@@ -157,3 +157,21 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
   detection and render end-to-end: exactly the constructed window was found
   and correctly stacked with a clean cut at its boundary. See VALIDATION.md.
   B-roll and complex-motion-layer reproduction remain unimplemented, as before.
+
+## 2026-09-15 — v0.11.0 (accepted stable)
+
+- Fixed a pre-existing Windows-only crash in `scripts/versions.py`: Vietnamese
+  status text couldn't be printed on Windows' default console codepage,
+  making a successful checkpoint look like a failure. Forced UTF-8 stdout.
+- User ran the app for real against a 23-minute 4K source and 4 real clips
+  (subject gallery, selected-subject tracking, stacked-view detection all
+  completed through the browser). Diagnosed slow processing as CPU-only face
+  recognition capped at 2 workers plus a 4-thread render limit, versus this
+  machine's 20 CPUs/62 GB/idle NVIDIA GPU; raised local `FACE_ENGINE_WORKERS`
+  to 6 and `RENDER_THREADS` to 12 (this machine's `.env` only). GPU
+  acceleration for the face-engine was proposed as a further follow-up.
+- User explicitly accepted this build as stable. Promoted with
+  `scripts/versions.py checkpoint v0.11.0 --accepted`: git tag `v0.11.0`,
+  images `talkcut-studio:v0.11.0` / `talkcut-face-engine:v0.11.0`, SQLite
+  snapshot recorded. First stable (not just candidate) version in this
+  project. See releases.md.
