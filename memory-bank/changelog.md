@@ -175,3 +175,15 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
   images `talkcut-studio:v0.11.0` / `talkcut-face-engine:v0.11.0`, SQLite
   snapshot recorded. First stable (not just candidate) version in this
   project. See releases.md.
+
+## 2026-09-16 — post-v0.11.0 fix
+
+- User feedback: the stacked seam's fixed dark gradient looked out of place.
+  Replaced it with a bridge derived from the stacked image's own pixels
+  (heavily blurred, alpha-faded by a shape-only mask) so it always matches
+  the clip's actual background/lighting instead of a fixed colour.
+  `stacked_view.gradient_asset` renamed `seam_mask_asset` (now a pure alpha
+  shape, not a coloured PNG). 170 Python tests pass (1 new, real ffmpeg,
+  proving the seam colour tracks the surrounding footage). Re-rendered a real
+  user clip live and visually confirmed against real stacked segments — see
+  VALIDATION.md. Not yet re-checkpointed as a new stable version.

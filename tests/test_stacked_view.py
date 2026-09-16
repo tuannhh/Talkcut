@@ -84,7 +84,31 @@ def test_stacked_composite_shows_both_halves_with_a_seam_only_inside_the_window(
     inside_bottom = pixel(45, 540, 1700)
     assert inside_top != inside_bottom  # two different crops, not a duplicated frame
     seam = pixel(45, 540, 960)
-    assert seam != inside_top and seam != inside_bottom  # the gradient band is visible at the seam
+    assert seam != inside_top and seam != inside_bottom  # the blurred seam bridge is visible
+
+
+@pytest.mark.skipif(not shutil.which('ffmpeg'), reason='requires a real ffmpeg binary')
+def test_seam_takes_its_color_from_the_clips_own_footage_not_a_fixed_color():
+    info = {'width': 1920, 'height': 1080}
+    settings = Settings().model_dump()
+    segments = [{'start': 1.0, 'end': 2.0, 'top': 'a' * 24, 'bottom': 'b' * 24,
+                 'box_top': [.02, .1, .3, .5], 'box_bottom': [.7, .1, .98, .5]}]
+    vf = wrap('null', segments, info, settings)
+    # A horizontal colour ramp: bluish where the top crop samples from (low X),
+    # reddish where the bottom crop samples from (high X). A fixed seam colour
+    # (the old black/gradient band) would not pick up either hue.
+    graph = f"color=black:s=1920x1080:r=30:d=3,geq=r='255*X/1920':g=80:b='255*(1-X/1920)',{vf},format=rgb24[out]"
+    result = subprocess.run(['ffmpeg', '-v', 'error', '-filter_complex', graph, '-map', '[out]',
+                             '-t', '3', '-f', 'rawvideo', '-'], capture_output=True, check=True)
+    frame_bytes = 1080 * 1920 * 3
+
+    def pixel(frame_index, x, y):
+        offset = frame_index * frame_bytes + (y * 1080 + x) * 3
+        return tuple(result.stdout[offset:offset + 3])
+
+    seam = pixel(45, 540, 960)
+    assert seam != (0, 0, 0)
+    assert seam[0] > 15 and seam[2] > 15  # blended tone from both sides' actual footage, not a fixed dark colour
 
 
 def test_scan_endpoint_requires_both_subjects_and_enqueues_persistent_work(monkeypatch):

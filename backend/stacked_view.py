@@ -18,6 +18,7 @@ from .media import ffmpeg
 _lock = threading.RLock()
 VERSION = 'stacked-v1'
 SEAM_HEIGHT = 220
+SEAM_BLUR = 26
 
 
 def wide_two_shot(box_top, box_bottom, max_width=.34, min_gap=.05):
@@ -187,19 +188,25 @@ def detect(source, clip, progress=lambda *a: None):
         return result
 
 
-def gradient_asset():
-    """A soft artistic band across the stacked seam; generated once and cached."""
-    path = config.DATA / 'generated' / 'stacked-seam.png'
+def seam_mask_asset():
+    """Shape only, no colour: a vertical alpha fade used to blend the seam.
+
+    The seam itself takes its colour from the clip's own footage (a blurred
+    bridge between the two crops), so it matches any background/lighting
+    instead of imposing a fixed black/white band. This mask just controls how
+    that blurred bridge fades into the sharp crops above and below it.
+    """
+    path = config.DATA / 'generated' / 'stacked-seam-mask.png'
     if path.exists():
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
     from PIL import Image, ImageDraw
-    im = Image.new('RGBA', (1080, SEAM_HEIGHT), (0, 0, 0, 0))
+    im = Image.new('L', (1080, SEAM_HEIGHT), 0)
     draw = ImageDraw.Draw(im)
     for y in range(SEAM_HEIGHT):
         distance = abs(y - SEAM_HEIGHT / 2) / (SEAM_HEIGHT / 2)
-        alpha = int(230 * max(0, 1 - distance) ** 1.4)
-        draw.line((0, y, 1080, y), fill=(8, 10, 14, alpha))
+        value = int(235 * max(0, 1 - distance) ** 1.4)
+        draw.line((0, y, 1080, y), fill=value)
     im.save(path)
     return path
 
@@ -209,9 +216,13 @@ def wrap(vf, segments, info, settings):
 
     The existing graph (crop/mix/etc, built for the primary subject) runs
     unchanged on one branch; a second branch crops the two selected faces
-    directly from the original frame, stacks them with a gradient seam, and
-    is only shown during the detected windows. Audio and caption timing are
-    untouched: this is a purely visual overlay, like the existing Mix.
+    directly from the original frame and stacks them. The seam between them
+    is a heavily blurred bridge built from the stacked image's own pixels
+    (not a fixed colour), so it always matches this clip's actual background
+    and lighting; a static alpha mask only controls how it fades into the
+    sharp crops above and below. Only shown during the detected windows.
+    Audio and caption timing are untouched: this is a purely visual overlay,
+    like the existing Mix.
     """
     if not segments:
         return vf
@@ -238,7 +249,7 @@ def wrap(vf, segments, info, settings):
     top_x, top_y = expression(tops, 'x'), expression(tops, 'y')
     bottom_x, bottom_y = expression(bottoms, 'x'), expression(bottoms, 'y')
     enable = balanced_sum([f'gte(t,{s["start"]})*lt(t,{s["end"]})' for s in segments])
-    gradient = str(gradient_asset()).replace('\\', '\\\\').replace(':', '\\:').replace("'", "'\\''")
+    mask = str(seam_mask_asset()).replace('\\', '\\\\').replace(':', '\\:').replace("'", "'\\''")
     seam_y = 960 - SEAM_HEIGHT // 2
     return (
         f"split=2[sv_src][sv_pipein];"
@@ -247,7 +258,10 @@ def wrap(vf, segments, info, settings):
         f"[sv_topin]crop={cw}:{ch}:x='{top_x}':y='{top_y}',scale=1080:960:flags=lanczos,setsar=1[sv_top];"
         f"[sv_botin]crop={cw}:{ch}:x='{bottom_x}':y='{bottom_y}',scale=1080:960:flags=lanczos,setsar=1[sv_bot];"
         f"[sv_top][sv_bot]vstack=inputs=2[sv_stacked];"
-        f"movie='{gradient}',loop=loop=-1:size=1:start=0,setpts=N/30/TB[sv_gradient];"
-        f"[sv_stacked][sv_gradient]overlay=0:{seam_y}[sv_final];"
+        f"[sv_stacked]split=2[sv_base][sv_seamsrc];"
+        f"[sv_seamsrc]crop=1080:{SEAM_HEIGHT}:0:{seam_y},boxblur={SEAM_BLUR}:{SEAM_BLUR}[sv_blur];"
+        f"movie='{mask}',loop=loop=-1:size=1:start=0,setpts=N/30/TB,format=gray[sv_mask];"
+        f"[sv_blur][sv_mask]alphamerge[sv_seam];"
+        f"[sv_base][sv_seam]overlay=0:{seam_y}[sv_final];"
         f"[sv_pipeout][sv_final]overlay=0:0:enable='{enable}'"
     )

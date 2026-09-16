@@ -247,3 +247,22 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
   source video is available.
 - Not a stable handoff. See `memory-bank/active-context.md` (v11) for the
   fixed top/bottom design decision and its rationale.
+
+## Post-v0.11.0 fix — content-derived seam — 2026-09-16
+
+- User feedback on the accepted `v0.11.0` build: the seam between the two
+  stacked halves defaulted to a fixed dark gradient and looked out of place.
+  Replaced it with a bridge built from the stacked image's own pixels (a
+  heavily blurred crop of the seam region, alpha-faded by a static shape-only
+  mask) instead of any fixed colour — it now always matches the clip's own
+  background/lighting.
+- 170 Python tests pass inside Docker with real ffmpeg (1 new: a real-FFmpeg
+  test proving the seam colour tracks a colour ramp placed under each half,
+  i.e. it is genuinely content-derived and not a hardcoded value).
+- Re-rendered a real user clip (`3 bước đưa AI vào vận hành doanh nghiệp`,
+  the actual 4K MISA source, 188.5s, 9 AI-detected stacked segments) with the
+  fix live in the running container. Frames extracted at 13s and 70s (inside
+  two different real stacked segments) show the actual teal/patterned studio
+  backdrop blended softly across the seam instead of a flat dark band; a
+  frame at 64s (outside any segment) confirms the ordinary single-subject
+  crop is unaffected.
