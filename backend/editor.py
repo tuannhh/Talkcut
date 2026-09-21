@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
 from . import config, google_ai, store
-from .media import ffmpeg, probe, frame, encode_args, normalized_video
+from .media import ffmpeg, probe, frame, encode_args, normalized_video, hwaccel_input_args
 
 W, H = 1080, 1920
 
@@ -350,7 +350,7 @@ def render(source, clip, words, settings, directory, progress):
         escaped = str(directory / 'captions.ass').replace('\\', '\\\\').replace(':', '\\:').replace("'", "'\\''")
         vf += f",ass='{escaped}':fontsdir='{Path(__file__).parent / 'fonts'}'"
     progress('Đang dựng nội dung và phụ đề karaoke Full HD', 42)
-    ffmpeg(['-ss', str(clip['start']), '-i', source, '-t', str(clip['end'] - clip['start']), '-vf', vf,
+    ffmpeg(['-ss', str(clip['start']), *hwaccel_input_args(), '-i', source, '-t', str(clip['end'] - clip['start']), '-vf', vf,
             '-af', 'aresample=48000,apad', *encode_args(), directory / 'main.mp4'])
     parts.append(directory / 'main.mp4')
     if settings['outro_asset']:

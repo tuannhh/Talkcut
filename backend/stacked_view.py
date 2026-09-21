@@ -13,7 +13,7 @@ import statistics
 import threading
 from pathlib import Path
 from . import config
-from .media import ffmpeg
+from .media import ffmpeg, hwaccel_input_args
 
 _lock = threading.RLock()
 VERSION = 'stacked-v1'
@@ -134,7 +134,7 @@ def detect(source, clip, progress=lambda *a: None):
                     import shutil
                     shutil.copyfile(old, proxy)
                 else:
-                    ffmpeg(['-ss', str(clip['start'] + a), '-i', source, '-t', str(min(30, duration - a)),
+                    ffmpeg(['-ss', str(clip['start'] + a), *hwaccel_input_args(), '-i', source, '-t', str(min(30, duration - a)),
                             '-vf', 'scale=720:-2,fps=6', '-an', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '24', proxy])
         progress('Đang tách góc máy để tìm cảnh toàn đủ hai người', 15)
         layout = {}

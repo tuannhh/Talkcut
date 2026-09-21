@@ -154,6 +154,43 @@ python -m pytest tests -q
 node --test frontend/src/studio-helpers.test.mjs
 ```
 
+## Tăng tốc GPU (tự động phát hiện, 2GB–8GB+ VRAM)
+
+Chỉ có **một bản image** — không còn track CPU/GPU tách riêng.
+`scripts/start.sh` tự kiểm tra máy chủ có driver NVIDIA + NVIDIA Container
+Toolkit hay không (Windows: Docker Desktop với WSL2 GPU support) và tự thêm
+overlay `compose.gpu.yaml` khi cần:
+
+```sh
+./scripts/start.sh
+```
+
+Chạy `docker compose up -d --build` trực tiếp cũng an toàn: không có overlay
+thì ứng dụng tự dùng CPU, không crash, không cần khai báo gì thêm. Hai việc
+nặng nhất có đường GPU:
+
+- **`face-engine`** (SCRFD dò mặt + ArcFace nhận diện): chạy qua CUDA
+  execution provider của `onnxruntime-node` khi phát hiện GPU, tự rơi về CPU
+  nếu không có hoặc driver không tương thích. Image chỉ cài đúng runtime CUDA
+  library cần dùng (không dùng base image `nvidia/cuda:*-cudnn-runtime` đầy
+  đủ), nên máy không có GPU không phải tải image nặng hơn cần thiết.
+- **Render FFmpeg**: cùng một binary FFmpeg (build từ nguồn, có NVENC/NVDEC)
+  dùng cho mọi máy — `h264_nvenc` chỉ thật sự chạy khi driver NVIDIA lộ ra
+  qua Container Toolkit, ngược lại tự dùng `libx264`.
+
+`RENDER_ACCEL` và `FACE_ENGINE_ACCEL` (`auto|cuda|cpu`, mặc định `auto`) chọn
+chế độ tăng tốc. Ngoài biến môi trường, ứng dụng còn có **nút gạt GPU/CPU
+ngay trong giao diện** (biểu tượng bánh răng ở góc trên → "Tăng tốc phần
+cứng"): mục này chỉ hiện khi phát hiện GPU NVIDIA thật trên máy chạy Docker;
+máy không có GPU sẽ không thấy phần này và chỉ dùng CPU. Nút gạt gọi
+`GET/POST /api/accel`, đổi ngay không cần restart container.
+`FACE_ENGINE_WORKERS` bỏ trống sẽ tự chia theo VRAM phát hiện được (2GB→2,
+4GB→4, 6GB→6, 8GB+→8 worker), mỗi worker được cấp giới hạn VRAM riêng
+(`FACE_ENGINE_GPU_MEM_LIMIT_MB`) để không tràn bộ nhớ trên card nhỏ. Chiều
+nhận diện khuôn mặt hiện chỉ đọc trạng thái (CUDA hay CPU) trong giao diện,
+chưa có nút đổi sống — đổi `FACE_ENGINE_ACCEL` cần build lại container. Xem
+chi tiết biến môi trường trong `.env.example`.
+
 ## Chạy local hay máy chủ?
 
 Khuyến nghị hiện tại: Docker local cho cá nhân có source trên máy. VPS có SSD bền vững phù hợp khi cần chạy 24/7 hoặc dùng từ nhiều máy, sau khi thêm đăng nhập/HTTPS/backup. Cloud Run cần tách API và render worker, chuyển media sang object storage, DB và hàng đợi ra ngoài; không đưa nguyên SQLite + local volume + worker nền hiện tại lên service. Xem [kiến trúc và nguồn tham chiếu](memory-bank/architecture.md).

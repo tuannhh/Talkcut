@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 from pydantic import BaseModel, Field
 from . import config, google_ai, store
-from .media import ffmpeg, probe, frame
+from .media import ffmpeg, probe, frame, hwaccel_input_args
 from .schemas import Settings
 
 
@@ -48,7 +48,7 @@ def analyze(item, progress):
     folder=source.parent; proxy=folder/'analysis.mp4'; thumb=folder/'thumbnail.jpg'
     progress('Đang chuẩn bị video mẫu và âm thanh',10)
     frame(source,thumb,min(2,info['duration']/4))
-    ffmpeg(['-i',source,'-vf','scale=480:854:force_original_aspect_ratio=decrease:force_divisible_by=2,fps=8',
+    ffmpeg([*hwaccel_input_args(),'-i',source,'-vf','scale=480:854:force_original_aspect_ratio=decrease:force_divisible_by=2,fps=8',
             '-c:v','libx264','-preset','veryfast','-crf','27','-c:a','aac','-b:a','64k','-movflags','+faststart',proxy])
     if proxy.stat().st_size>18*1024**2:
         raise ValueError('Video mẫu có quá nhiều chi tiết. Chọn đoạn ngắn hơn để học phong cách.')

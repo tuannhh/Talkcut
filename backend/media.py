@@ -1,11 +1,38 @@
 import json
 import subprocess
 from pathlib import Path
-from .config import FFMPEG, FFPROBE, THREADS
+from .config import FFMPEG, FFPROBE, THREADS, RENDER_ACCEL
+from . import gpu_profile
 
 
 class MediaError(RuntimeError):
     pass
+
+
+def _resolved_render_accel():
+    from . import accel_settings
+    return accel_settings.get().get('render_accel', RENDER_ACCEL)
+
+
+def _accel_enabled():
+    mode = _resolved_render_accel()
+    if mode == 'cpu':
+        return False
+    gpu = gpu_profile.detect_gpu()
+    if mode == 'cuda':
+        return True  # forced: let ffmpeg fail loudly if the hardware/driver isn't there
+    return bool(gpu)  # auto: only when a GPU is actually present
+
+
+def hwaccel_input_args():
+    """Args to place immediately before `-i <source>` to decode via NVDEC.
+
+    Safe no-op when acceleration is off or ffmpeg lacks the `cuda` hwaccel;
+    frames still come back as normal CPU frames for the existing filters.
+    """
+    if not _accel_enabled() or not gpu_profile.ffmpeg_capabilities()['cuda_decode']:
+        return []
+    return ['-hwaccel', 'cuda']
 
 
 def run(args, timeout=7200):
@@ -37,17 +64,27 @@ def probe(path):
 
 
 def frame(path, dest, seconds=0):
-    ffmpeg(['-ss', str(seconds), '-i', path, '-frames:v', '1', '-vf', 'scale=720:-2', dest], 120)
+    ffmpeg(['-ss', str(seconds), *hwaccel_input_args(), '-i', path, '-frames:v', '1', '-vf', 'scale=720:-2', dest], 120)
     return dest
 
 
 def encode_args():
+    if _accel_enabled() and gpu_profile.ffmpeg_capabilities()['nvenc']:
+        # NVENC has no direct CRF equivalent, and is measurably less bit-efficient
+        # than libx264 at the same visual quality (measured on real 1080x1920
+        # output: uncapped '-cq 19 -b:v 0' produced an 85% larger file than the
+        # libx264 crf-18 output at the same duration/resolution for no visible
+        # quality gain). cq 23 plus a bitrate cap brings size back in line with
+        # the CPU path while keeping NVENC's real advantage, which is speed.
+        return ['-c:v', 'h264_nvenc', '-preset', 'p5', '-tune', 'hq', '-rc', 'vbr', '-cq', '23',
+                '-b:v', '6M', '-maxrate', '9M', '-bufsize', '12M',
+                '-pix_fmt', 'yuv420p', '-r', '30', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', '-movflags', '+faststart']
     return ['-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-threads', THREADS, '-pix_fmt', 'yuv420p', '-r', '30', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', '-movflags', '+faststart']
 
 
 def normalized_video(path, target):
     info = probe(path)
-    args = ['-i', path]
+    args = [*hwaccel_input_args(), '-i', path]
     if not info['has_audio']:
         args += ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo']
     args += ['-map', '0:v:0', '-map', '0:a:0' if info['has_audio'] else '1:a:0', '-vf',

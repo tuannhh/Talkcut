@@ -17,3 +17,8 @@ FFMPEG = os.getenv('FFMPEG', 'ffmpeg')
 FFPROBE = os.getenv('FFPROBE', 'ffprobe')
 THREADS = str(max(1, min(16, int(os.getenv('RENDER_THREADS', '4')))))
 MAX_BYTES = int(float(os.getenv('MAX_UPLOAD_GB', '10')) * 1024 ** 3)
+
+# Optional NVIDIA acceleration for ffmpeg (NVENC encode / CUDA decode).
+# auto: use it when a GPU + capable ffmpeg are both detected; cuda: force on
+# (fails loudly if unavailable); cpu: force the original libx264 path.
+RENDER_ACCEL = os.getenv('RENDER_ACCEL', 'auto').lower()

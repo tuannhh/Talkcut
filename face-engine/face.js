@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const ort = require('onnxruntime-node');
+const gpu = require('./gpu');
 
 const MODEL_DIR = process.env.FACE_MODEL_DIR || '/data/face-models';
 const MODELS = {
@@ -40,12 +41,46 @@ async function model(kind) {
 
 async function prefetchModels() { await Promise.all([model('scrfd'), model('arcface')]); }
 
+const ACCEL = (process.env.FACE_ENGINE_ACCEL || 'auto').toLowerCase();
 const options = { intraOpNumThreads: 1, graphOptimizationLevel: 'all', executionMode: 'sequential', logSeverityLevel: 3 };
+
+function cudaProviders() {
+  if (ACCEL === 'cpu') return null;
+  if (ACCEL !== 'cuda' && !gpu.detectGPU()) return null; // auto: skip CUDA when no NVIDIA GPU was found
+  const memLimitMb = Number(process.env.FACE_ENGINE_GPU_MEM_LIMIT_MB || 0);
+  const cudaProvider = { name: 'cuda', deviceId: 0 };
+  if (memLimitMb > 0) cudaProvider.cudaMemLimit = memLimitMb * 1024 * 1024;
+  return [cudaProvider, 'cpu'];
+}
+
+let activeProvider = 'cpu'; // updated as sessions actually load, for /status
+
+// Tries CUDA first (when requested/detected), then falls back to CPU-only if
+// the CUDA execution provider can't actually load (missing/mismatched
+// CUDA+cuDNN runtime libraries) — a broken GPU setup must never take the
+// engine down, only make it as fast as the CPU-only build always was.
+async function createSession(modelPath) {
+  const providers = cudaProviders();
+  if (providers) {
+    try {
+      const session = await ort.InferenceSession.create(modelPath, { ...options, executionProviders: providers });
+      activeProvider = 'cuda';
+      return session;
+    } catch (error) { console.warn(`Face engine: CUDA execution provider unavailable (${error.message}), falling back to CPU for ${path.basename(modelPath)}`); }
+  }
+  activeProvider = 'cpu';
+  return ort.InferenceSession.create(modelPath, { ...options, executionProviders: ['cpu'] });
+}
+
+function status() {
+  return { accelMode: ACCEL, gpu: gpu.detectGPU(), activeProvider, modelsLoaded: !!sessions };
+}
+
 let sessions;
 async function loadModels() {
   if (!sessions) sessions = Promise.all([
-    ort.InferenceSession.create(await model('scrfd'), options),
-    ort.InferenceSession.create(await model('arcface'), options),
+    createSession(await model('scrfd')),
+    createSession(await model('arcface')),
   ]).then(([detector, recognizer]) => ({ detector, recognizer }));
   return sessions;
 }
@@ -149,4 +184,4 @@ async function describe(buffer) {
   return described;
 }
 
-module.exports = { describe, prefetchModels };
+module.exports = { describe, prefetchModels, status };

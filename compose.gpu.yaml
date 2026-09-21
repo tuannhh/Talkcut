@@ -1,0 +1,34 @@
+# Grants GPU device access on top of compose.yaml. The images themselves
+# (built from the single Dockerfile / face-engine/Dockerfile) always carry
+# GPU support and auto-detect at startup; this overlay is only what actually
+# hands the container a GPU to detect. `scripts/start.sh` includes this file
+# automatically when it finds an NVIDIA GPU + the NVIDIA Container Toolkit —
+# you normally don't need to reference this file by hand. Manual use:
+#   docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
+name: talkcut-studio
+services:
+  studio:
+    environment:
+      RENDER_ACCEL: ${RENDER_ACCEL:-auto}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, video, utility]
+  face-engine:
+    environment:
+      FACE_ENGINE_ACCEL: ${FACE_ENGINE_ACCEL:-auto}
+      FACE_ENGINE_GPU_MEM_LIMIT_MB: ${FACE_ENGINE_GPU_MEM_LIMIT_MB:-}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]

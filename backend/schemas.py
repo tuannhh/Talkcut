@@ -143,6 +143,10 @@ class AnalyzeRequest(BaseModel):
         return self
 
 
+class AccelRequest(BaseModel):
+    render_accel: Literal['auto', 'cuda', 'cpu']
+
+
 class ImportRequest(BaseModel):
     kind: Literal['youtube', 'path']
     value: str = Field(min_length=1, max_length=2048)

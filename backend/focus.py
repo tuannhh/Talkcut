@@ -10,7 +10,7 @@ import threading
 _layout_lock=threading.RLock()
 from pathlib import Path
 from . import config, google_ai
-from .media import ffmpeg
+from .media import ffmpeg, hwaccel_input_args
 
 VERSION = 'speaker-shots-v2.2'
 KINDS = {'speaker', 'reaction', 'broll', 'wrong_shot', 'broken', 'transition', 'end', 'uncertain'}
@@ -204,7 +204,7 @@ def analyze(source, clip, progress, words=None):
         if part.exists():
             chunk=json.loads(part.read_text())
         else:
-            ffmpeg(['-ss',str(clip['start']+start),'-i',source,'-t',str(length),'-vf','scale=720:-2,fps=6','-c:v','libx264','-preset','ultrafast','-crf','24','-c:a','aac','-b:a','64k',proxy])
+            ffmpeg(['-ss',str(clip['start']+start),*hwaccel_input_args(),'-i',source,'-t',str(length),'-vf','scale=720:-2,fps=6','-c:v','libx264','-preset','ultrafast','-crf','24','-c:a','aac','-b:a','64k',proxy])
             excerpt=[{'time':round(w['start']-clip['start']-start,2),'text':w['text'],'speaker':w.get('speaker','')} for w in (words or []) if clip['start']+start<=w['start']<clip['start']+start+length]
             prompt='''Bạn là đạo diễn dựng video toạ đàm. PHẢI nghe audio và quan sát chuyển động môi để xác định người ĐANG NÓI, không chọn người to nhất/ở giữa/người đang nghe. Transcript chỉ là gợi ý; nhãn speaker không phải danh tính.
 Chia toàn bộ video đính kèm thành các cảnh liên tiếp; tách cảnh tại mỗi cut, đổi người nói, bắt đầu/kết thúc lia máy. Thời gian GIÂY tính từ 0 của file đính kèm.

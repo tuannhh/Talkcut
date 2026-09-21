@@ -8,7 +8,7 @@ _image_lock=threading.RLock()
 from pathlib import Path
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 from . import config, store, focus
-from .media import ffmpeg, probe
+from .media import ffmpeg, probe, hwaccel_input_args
 
 
 def freeze(source, clip, seconds, target):
@@ -25,7 +25,7 @@ def freeze(source, clip, seconds, target):
             x=max(0,min(info['width']-p['cw'],p['x']*info['width']-p['cw']/2))
             y=max(0,min(info['height']-p['ch'],p['y']*info['height']-p['ch']/2))
             crop=f"crop={p['cw']}:{p['ch']}:{x}:{y},scale=1080:1920"
-    ffmpeg(['-ss',str(seconds),'-i',source,'-frames:v','1','-vf',crop,target])
+    ffmpeg(['-ss',str(seconds),*hwaccel_input_args(),'-i',source,'-frames:v','1','-vf',crop,target])
 
 
 def first_frame(clip):

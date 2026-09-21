@@ -11,7 +11,7 @@ import re
 import threading
 from pathlib import Path
 from . import config
-from .media import ffmpeg, frame
+from .media import ffmpeg, frame, hwaccel_input_args
 from .face_engine import describe, portrait, best_match, cosine
 
 _lock = threading.RLock()
@@ -214,7 +214,7 @@ def analyze(source, clip, progress):
             if old.exists():
                 import shutil
                 shutil.copyfile(old,proxy)
-            else:ffmpeg(['-ss',str(clip['start']+a),'-i',source,'-t',str(min(30,duration-a)),'-vf','scale=720:-2,fps=6','-an','-c:v','libx264','-preset','ultrafast','-crf','24',proxy])
+            else:ffmpeg(['-ss',str(clip['start']+a),*hwaccel_input_args(),'-i',source,'-t',str(min(30,duration-a)),'-vf','scale=720:-2,fps=6','-an','-c:v','libx264','-preset','ultrafast','-crf','24',proxy])
     progress('Đang tách góc máy để tìm lại chủ thể',15)
     layout={};focus.visual_layout(directory,layout,source,clip)
     cuts=layout.get('visual_cuts',[]);bounds=[0,*cuts,duration];samples=[];caps={}
@@ -257,7 +257,7 @@ def analyze(source, clip, progress):
         progress(f'Đang kiểm tra góc khó ở ảnh gốc · {n+1}/{len(uncertain)}',86+int(8*n/max(1,len(uncertain))))
         for fraction in (.25,.75):
             t=a+(b-a)*fraction;path=directory/f'native-{shot}-{fraction}.jpg'
-            ffmpeg(['-ss',str(clip['start']+t),'-i',source,'-frames:v','1','-vf','scale=1440:-2','-q:v','2',path])
+            ffmpeg(['-ss',str(clip['start']+t),*hwaccel_input_args(),'-i',source,'-frames:v','1','-vf','scale=1440:-2','-q:v','2',path])
             image=cv2.imread(str(path));match=best_match(reference_embedding,describe(image)) if image is not None else None
             if match:
                 recovered.append({'id':len(samples)+len(recovered),'shot':shot,'time':t,'face':match['box']})

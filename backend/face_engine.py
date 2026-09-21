@@ -23,6 +23,16 @@ def _encode(image) -> bytes:
     return encoded.tobytes()
 
 
+def status() -> dict | None:
+    """Best-effort GPU/accel status for the UI; None if the engine is unreachable."""
+    try:
+        response = httpx.get(URL + '/status', timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except (httpx.HTTPError, ValueError):
+        return None
+
+
 def describe(image: object) -> list[dict]:
     """Describe detected local faces, rejecting malformed engine output."""
     try:

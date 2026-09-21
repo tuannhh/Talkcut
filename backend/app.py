@@ -7,9 +7,9 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
-from . import config, store, pipeline, google_ai, presets
+from . import config, store, pipeline, google_ai, presets, accel_settings, gpu_profile, face_engine
 from .media import probe, MediaError
-from .schemas import ImportRequest, AnalyzeRequest, ClipEdit, Settings, BatchBrand
+from .schemas import ImportRequest, AnalyzeRequest, ClipEdit, Settings, BatchBrand, AccelRequest
 
 
 @asynccontextmanager
@@ -58,6 +58,22 @@ async def bad_media(request, exc):
 @app.get('/api/health')
 def health():
     return {'status': 'ok', 'google_configured': bool(config.API_KEY), 'models': {'content': config.CONTENT_MODEL, 'stt': config.STT_MODEL, 'tts': config.TTS_MODEL}, 'source_root': str(config.SOURCE_ROOT), 'max_upload_gb': config.MAX_BYTES / 1024**3}
+
+
+@app.get('/api/accel')
+def get_accel():
+    gpu = gpu_profile.detect_gpu()
+    return {
+        'gpu': gpu and {**gpu, 'tier_mb': gpu_profile.tier_for(gpu['vram_mb'])},
+        'render_accel': accel_settings.get().get('render_accel', 'auto'),
+        'render_capabilities': gpu_profile.ffmpeg_capabilities(),
+        'face_engine': face_engine.status(),
+    }
+
+
+@app.post('/api/accel')
+def set_accel(body: AccelRequest):
+    return accel_settings.set_render_accel(body.render_accel)
 
 
 @app.get('/api/studio')
