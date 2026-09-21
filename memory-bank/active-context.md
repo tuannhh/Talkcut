@@ -412,3 +412,37 @@ real source: valid MP3 (mp3/16kHz/mono) produced, no Gemini credits spent.
 Audited every other ffmpeg external-lib dependency the backend uses at the
 same time — x264/libass/zlib/aac all present, all other filters are built-in,
 no `drawtext`/libfreetype needed — so libmp3lame was the only gap.
+
+## Review-feedback polish pass — 2026-09-21
+
+User reviewed a real rendered clip and gave six items. Done + verified this
+pass (all on a real render/stack): (1) failed job rows no longer dump raw
+ffmpeg stderr — they show a friendly Vietnamese line, and a dismiss (X) button
+(`DELETE /api/jobs/{id}`, blocks queued/running) lets stale failures be
+cleared; (4) render progress is now real, streamed from ffmpeg via a new
+`media.ffmpeg_progress()` (`-progress pipe:1`, defensive fallback) wired into
+the two long encodes in `editor.render` (main 42→64, final mux 78→94) —
+verified the bar moved 45→63 then 79→93 on a live render; jobs also store a
+`started` epoch so the UI shows a bigger % plus an ETA (`etaText` in
+main.jsx); (6) exports have a delete button → `DELETE /api/exports/{id}`
+(removes the DB record, the final.mp4, and the whole disposable render folder;
+verified file+folder gone); (3a) the stacked-view seam was too faint — mask
+regenerated as `stacked-seam-mask-v2.png` with a fully-opaque central plateau
+(was peak 235 falling off from centre), SEAM_HEIGHT 220→300, blur 26→40.
+
+Diagnosed, NOT yet fixed (need a re-render + the user's eyes, so deferred):
+- (2) "đứng hình" freezes: the pacing holds. freezedetect on the user's
+  exported clip flagged a clean 2.0s frozen span matching
+  `transitions.py`'s Mix `tpad=stop_mode=clone:stop_duration=2`; also
+  `calm_short_shots` holds up to `calm_max_seconds` (default 4s). Likely the
+  fix is shortening these, but must verify visually.
+- (3b) stacked "some clips yes, some no": data-grounded — several clips have
+  `stacked_enabled=True` but are missing one of the two subjects
+  (`tracking_subject`/`_2`), so `editor.render` silently skips stacking with
+  no user feedback; plus the `wide_two_shot` detection bar may be too strict.
+  Fix = warn in UI when stacked is on but a subject is unset, and/or relax
+  detection.
+- (5) end frame cut mid-word / ugly mouth: the main content is cut at
+  `clip['end']` with no tail handling. Proposed a short video+audio
+  fade-out (or snapping the end to a word/silence boundary), pending the
+  user's preference.

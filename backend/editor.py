@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
 from . import config, google_ai, store
-from .media import ffmpeg, probe, frame, encode_args, normalized_video, hwaccel_input_args
+from .media import ffmpeg, ffmpeg_progress, probe, frame, encode_args, normalized_video, hwaccel_input_args
 
 W, H = 1080, 1920
 
@@ -350,8 +350,10 @@ def render(source, clip, words, settings, directory, progress):
         escaped = str(directory / 'captions.ass').replace('\\', '\\\\').replace(':', '\\:').replace("'", "'\\''")
         vf += f",ass='{escaped}':fontsdir='{Path(__file__).parent / 'fonts'}'"
     progress('Đang dựng nội dung và phụ đề karaoke Full HD', 42)
-    ffmpeg(['-ss', str(clip['start']), *hwaccel_input_args(), '-i', source, '-t', str(clip['end'] - clip['start']), '-vf', vf,
-            '-af', 'aresample=48000,apad', *encode_args(), directory / 'main.mp4'])
+    main_seconds = clip['end'] - clip['start']
+    ffmpeg_progress(['-ss', str(clip['start']), *hwaccel_input_args(), '-i', source, '-t', str(main_seconds), '-vf', vf,
+                     '-af', 'aresample=48000,apad', *encode_args(), directory / 'main.mp4'],
+                    main_seconds, lambda frac: progress('Đang dựng nội dung và phụ đề karaoke Full HD', 42 + int(frac * 22)))
     parts.append(directory / 'main.mp4')
     if settings['outro_asset']:
         progress('Đang ghép outro', 65)
@@ -387,8 +389,9 @@ def render(source, clip, words, settings, directory, progress):
         filters.append(f'{voice}[cue]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[sfxout]')
         a='[sfxout]'
     if filters:
-        args += ['-filter_complex', ';'.join(filters), '-map', v, '-map', a, '-t', str(probe(joined)['duration']), *encode_args(), output]
-        ffmpeg(args)
+        joined_seconds = probe(joined)['duration']
+        args += ['-filter_complex', ';'.join(filters), '-map', v, '-map', a, '-t', str(joined_seconds), *encode_args(), output]
+        ffmpeg_progress(args, joined_seconds, lambda frac: progress('Đang trộn nhạc và áp dụng watermark', 78 + int(frac * 16)))
     else:
         import shutil
         shutil.copyfile(joined, output)

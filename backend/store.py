@@ -50,4 +50,9 @@ def listing(kind):
     return [json.loads(row['payload']) for row in rows]
 
 
+def delete(id, kind):
+    with connect() as db:
+        db.execute('DELETE FROM records WHERE id=? AND kind=?', (id, kind))
+
+
 init()

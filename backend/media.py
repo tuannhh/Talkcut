@@ -49,6 +49,45 @@ def ffmpeg(args, timeout=7200):
     return run([FFMPEG, '-hide_banner', '-loglevel', 'error', '-y', '-threads', THREADS, '-filter_complex_threads', '1', *args], timeout)
 
 
+def ffmpeg_progress(args, duration, on_frac, timeout=7200):
+    """Like ffmpeg() but streams real encode progress via `-progress pipe:1`.
+
+    `on_frac` is called with a 0..1 fraction as ffmpeg advances through
+    `duration` seconds of output. Errors behave exactly like run(): a non-zero
+    exit raises MediaError with the stderr tail. Progress reporting is
+    best-effort — any hiccup reading the pipe just means a coarser bar, never
+    a failed or hung render.
+    """
+    import threading
+    full = [str(x) for x in [FFMPEG, '-hide_banner', '-loglevel', 'error', '-y', '-threads', THREADS,
+                             '-filter_complex_threads', '1', '-progress', 'pipe:1', '-nostats', *args]]
+    try:
+        proc = subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    except OSError as error:
+        raise MediaError(str(error)) from None
+    stderr_chunks = []
+    stderr_thread = threading.Thread(target=lambda: stderr_chunks.append(proc.stderr.read()), daemon=True)
+    stderr_thread.start()
+    try:
+        for line in proc.stdout:
+            if duration and line.startswith('out_time_us='):
+                try:
+                    micros = int(line.split('=', 1)[1])
+                    on_frac(max(0, min(1, micros / 1_000_000 / duration)))
+                except (ValueError, ZeroDivisionError):
+                    pass
+    finally:
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            raise MediaError('Xử lý quá thời gian cho phép. Thử một nguồn ngắn hơn.') from None
+        stderr_thread.join(timeout=5)
+    if proc.returncode:
+        raise MediaError((stderr_chunks[0] if stderr_chunks else '')[-1800:] or 'ffmpeg thất bại.')
+    on_frac(1)
+
+
 def probe(path):
     data = json.loads(run([FFPROBE, '-v', 'error', '-show_format', '-show_streams', '-of', 'json', path], 60))
     video = next((s for s in data['streams'] if s['codec_type'] == 'video'), None)

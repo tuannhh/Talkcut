@@ -4,6 +4,7 @@ import os
 import queue
 import shutil
 import threading
+import time
 import uuid
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -288,7 +289,7 @@ def worker():
         id = jobs.get()
         job = store.get(id, 'job')
         try:
-            store.update(id, status='running')
+            store.update(id, status='running', started=time.time())
             def progress(message, percent):
                 store.update(id, message=message, progress=percent)
             result = dispatch(job, progress)

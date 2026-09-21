@@ -17,8 +17,8 @@ from .media import ffmpeg, hwaccel_input_args
 
 _lock = threading.RLock()
 VERSION = 'stacked-v1'
-SEAM_HEIGHT = 220
-SEAM_BLUR = 26
+SEAM_HEIGHT = 300
+SEAM_BLUR = 40
 
 
 def wide_two_shot(box_top, box_bottom, max_width=.34, min_gap=.05):
@@ -196,16 +196,25 @@ def seam_mask_asset():
     instead of imposing a fixed black/white band. This mask just controls how
     that blurred bridge fades into the sharp crops above and below it.
     """
-    path = config.DATA / 'generated' / 'stacked-seam-mask.png'
+    # v2: a fully-opaque central plateau (the hard vstack boundary sits here
+    # and must be completely hidden by the blurred bridge) that only fades to
+    # transparent near the top/bottom edges. The earlier version peaked at 235
+    # and fell off immediately from the centre, leaving the seam visible.
+    path = config.DATA / 'generated' / 'stacked-seam-mask-v2.png'
     if path.exists():
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
     from PIL import Image, ImageDraw
     im = Image.new('L', (1080, SEAM_HEIGHT), 0)
     draw = ImageDraw.Draw(im)
+    plateau = 0.5  # central 50% stays fully opaque; only the outer 25% each side fades
     for y in range(SEAM_HEIGHT):
         distance = abs(y - SEAM_HEIGHT / 2) / (SEAM_HEIGHT / 2)
-        value = int(235 * max(0, 1 - distance) ** 1.4)
+        if distance <= plateau:
+            value = 255
+        else:
+            edge = (distance - plateau) / (1 - plateau)  # 0 at plateau boundary -> 1 at the very edge
+            value = int(255 * max(0, 1 - edge) ** 1.6)
         draw.line((0, y, 1080, y), fill=value)
     im.save(path)
     return path

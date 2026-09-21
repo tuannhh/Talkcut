@@ -303,6 +303,15 @@ def retry(id: str):
     return pipeline.enqueue(job['kind'], job['target'], job['payload'])
 
 
+@app.delete('/api/jobs/{id}')
+def dismiss_job(id: str):
+    job = store.get(id, 'job')
+    if job['status'] in ('queued', 'running'):
+        raise ValueError('Không thể bỏ một tác vụ đang chạy.')
+    store.delete(id, 'job')
+    return {'deleted': True}
+
+
 @app.post('/api/assets')
 async def upload_asset(file: UploadFile = File(...)):
     name = Path(file.filename or 'asset').name
@@ -333,6 +342,20 @@ async def upload_asset(file: UploadFile = File(...)):
 def download(id: str):
     item = store.get(id, 'export')
     return FileResponse(config.DATA / item['path'], media_type='video/mp4', filename='talkcut-' + id[:8] + '-1080x1920.mp4')
+
+
+@app.delete('/api/exports/{id}')
+def delete_export(id: str):
+    item = store.get(id, 'export')
+    target = (config.DATA / item['path']).resolve()
+    if target.is_relative_to(config.DATA / 'renders') and target.is_file():
+        target.unlink(missing_ok=True)
+        # The whole render job folder (proxies, stills, intermediates) is disposable once the export is gone.
+        if target.parent != config.DATA / 'renders' and target.parent.is_dir():
+            import shutil
+            shutil.rmtree(target.parent, ignore_errors=True)
+    store.delete(id, 'export')
+    return {'deleted': True}
 
 
 @app.get('/media/{path:path}')
