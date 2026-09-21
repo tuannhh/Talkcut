@@ -19,7 +19,7 @@ RUN npm run build
 # ffmpeg needed driver >=610; this build only needs >=530.41).
 FROM debian:bookworm-slim AS ffmpeg-build
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git build-essential yasm nasm pkg-config libx264-dev libass-dev zlib1g-dev ca-certificates \
+    git build-essential yasm nasm pkg-config libx264-dev libass-dev libmp3lame-dev zlib1g-dev ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 RUN git clone --depth 1 --branch n12.1.14.0 https://github.com/FFmpeg/nv-codec-headers.git \
@@ -29,14 +29,17 @@ WORKDIR /build/ffmpeg
 # --enable-libass: karaoke captions (`ass=` filter, caption_enabled defaults
 # to true). --enable-zlib: PNG decode — watermark/intro art is rendered to
 # PNG by Pillow then composited with `overlay`, which needs to decode that
-# PNG even for the plain-text watermark default.
-RUN ./configure --enable-gpl --enable-nonfree --enable-cuda --enable-cuvid --enable-nvenc --enable-libx264 --enable-libass --enable-zlib \
+# PNG even for the plain-text watermark default. --enable-libmp3lame: MP3
+# audio encode — the analyze pipeline extracts audio-*.mp3 for Google STT
+# (pipeline.py). Debian's packaged ffmpeg shipped this; the from-source
+# build must enable it explicitly or `analyze` fails with "Encoder not found".
+RUN ./configure --enable-gpl --enable-nonfree --enable-cuda --enable-cuvid --enable-nvenc --enable-libx264 --enable-libass --enable-libmp3lame --enable-zlib \
       --disable-doc --disable-debug --disable-ffplay \
     && make -j"$(nproc)" \
     && make install DESTDIR=/build/out
 
 FROM python:3.12-slim-bookworm
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core fontconfig ca-certificates libglib2.0-0 libgl1 libx264-164 libass9 zlib1g && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core fontconfig ca-certificates libglib2.0-0 libgl1 libx264-164 libass9 libmp3lame0 zlib1g && rm -rf /var/lib/apt/lists/*
 COPY --from=ffmpeg-build /build/out/usr/local/bin/ffmpeg /build/out/usr/local/bin/ffprobe /usr/local/bin/
 WORKDIR /app
 COPY --from=frontend /usr/local/bin/node /usr/local/bin/node

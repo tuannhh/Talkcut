@@ -395,5 +395,20 @@ response both updated correctly), and confirmed the toggle is fully absent
 in the JSX unless `accel.gpu` is set. Not yet done: no test of the
 auto-detection branch on an actual GPU-less machine (only inspected the
 `scripts/start.sh` logic; the dev machine always has the RTX 3050 present).
-No git commit made yet — pending the user's review per the same
-handoff convention as v12.
+
+Committed and pushed to `origin/main` after the user approved (studio merge =
+`1b295a5`, macOS plan doc = `37738b6`).
+
+Regression found in user testing after that push and fixed: the `analyze`
+pipeline (`pipeline.py` extracts `audio-*.mp3` for Google STT) failed with
+"Default encoder for format mp3 ... Encoder not found". The from-source
+ffmpeg was configured without libmp3lame — Debian's packaged ffmpeg (used by
+the pre-merge CPU image) shipped MP3 encode, so this only surfaced once the
+merged image replaced apt-ffmpeg with the source build. Fixed by adding
+`libmp3lame-dev` + `--enable-libmp3lame` (build stage) and `libmp3lame0`
+(runtime) to the root `Dockerfile`. Verified by running the exact
+`pipeline.py` extraction command inside the rebuilt container against the
+real source: valid MP3 (mp3/16kHz/mono) produced, no Gemini credits spent.
+Audited every other ffmpeg external-lib dependency the backend uses at the
+same time — x264/libass/zlib/aac all present, all other filters are built-in,
+no `drawtext`/libfreetype needed — so libmp3lame was the only gap.
