@@ -27,7 +27,13 @@ WORKDIR /engine
 RUN chown engine:engine /engine
 USER engine
 COPY --chown=engine:engine package*.json ./
-RUN npm ci --omit=dev
+# onnxruntime-node ships prebuilt binaries for every OS/arch it supports; this
+# Linux x64 image only ever loads linux/x64, so drop win32, darwin and
+# linux/arm64 (~165MB) plus the TensorRT provider (face.js only uses cuda/cpu).
+RUN npm ci --omit=dev \
+    && find node_modules/onnxruntime-node/bin/napi-v6 -mindepth 1 -maxdepth 1 -type d ! -name linux -exec rm -rf {} + \
+    && find node_modules/onnxruntime-node/bin/napi-v6/linux -mindepth 1 -maxdepth 1 -type d ! -name x64 -exec rm -rf {} + \
+    && rm -f node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime_providers_tensorrt.so
 COPY --chown=engine:engine . ./
 ENV NODE_ENV=production PORT=3210 FACE_MODEL_DIR=/data/face-models FACE_ENGINE_ACCEL=auto
 EXPOSE 3210

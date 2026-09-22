@@ -487,3 +487,34 @@ Gemini credits, then found and fixed a merge regression that blocked CPU render.
   (build) + `libdav1d6` (runtime) in the root Dockerfile. This machine has an
   RTX 3050 (face-engine uses it) but the studio container was run CPU-only,
   which is exactly why it surfaced.
+
+## Caption size (preview vs export) + install-size trims — 2026-09-22
+
+User: subtitles render smaller than in the preview; also asked to optimize the
+build/install size.
+
+- Caption size root cause + fix: browsers size text by the em (unitsPerEm), but
+  libass scales a font so its OS/2 win-metrics (winAscent+winDescent) map to the
+  ASS Fontsize. Google Sans declares 1509+1079 win-metrics against a 1000 em
+  (2.59x), so at caption_size 64 libass rendered its em at only ~25px — ~2.6x
+  smaller than the CSS preview. (Every font is affected a little: DejaVu 0.86x,
+  Roboto 0.83x; Google Sans 0.39x is the extreme.) Fix: editor.make_ass now
+  multiplies the ASS Fontsize by (winAscent+winDescent)/unitsPerEm, read from the
+  exact file `fc-match` hands libass (pure-struct TTF parse, cached, clamps to
+  [1,3], falls back to 1.0 so a bad font can never blank captions). Applied to
+  both the Default and Hook (main-title) styles. Verified in-container: Google
+  Sans caption ink 24px -> 63px, DejaVu/Roboto -> ~62px, all matching the CSS
+  preview ink (~63px at size 64). No frontend change (preview was already right).
+
+- Install-size trims (safe, no feature loss):
+  * studio: dropped libgl1 — opencv-python-headless links libglib2.0 but not
+    libGL/X11 (verified via ldd), so its ~30MB mesa+X11 chain was dead weight.
+  * face-engine: onnxruntime-node ships prebuilt binaries for every OS/arch;
+    pruned win32, darwin and linux/arm64 (~165MB) plus the unused TensorRT
+    provider, keeping only linux/x64 (face.js uses cuda/cpu only).
+- Not touched (deliberately): the face-engine's ~2.2GB CUDA runtime (cuDNN
+  engines_precompiled 563MB + adv 261MB + cublas/cufft/curand). It is the GPU
+  feature the merge was built for and this machine's RTX 3050 uses it; trimming
+  cuDNN sublibraries is GPU/arch-specific and risky to ship blind. Flagged to the
+  user as the big remaining lever (a CPU-only face-engine variant would drop
+  ~2.5GB for GPU-less target devices) — their call.

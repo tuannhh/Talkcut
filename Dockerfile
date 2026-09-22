@@ -45,7 +45,9 @@ RUN ./configure --enable-gpl --enable-nonfree --enable-cuda --enable-cuvid --ena
     && make install DESTDIR=/build/out
 
 FROM python:3.12-slim-bookworm
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core fontconfig ca-certificates libglib2.0-0 libgl1 libx264-164 libass9 libmp3lame0 libdav1d6 zlib1g && rm -rf /var/lib/apt/lists/*
+# opencv-python-headless links libglib2.0 but not libGL/X11, so libgl1 (and its
+# ~30MB mesa+X11 dependency chain) is intentionally omitted.
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core fontconfig ca-certificates libglib2.0-0 libx264-164 libass9 libmp3lame0 libdav1d6 zlib1g && rm -rf /var/lib/apt/lists/*
 COPY --from=ffmpeg-build /build/out/usr/local/bin/ffmpeg /build/out/usr/local/bin/ffprobe /usr/local/bin/
 WORKDIR /app
 COPY --from=frontend /usr/local/bin/node /usr/local/bin/node

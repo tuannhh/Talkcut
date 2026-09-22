@@ -1,6 +1,9 @@
 """Timeline composition and exact word-event subtitles at 1080 × 1920."""
 import math
 import re
+import struct
+import subprocess
+from functools import lru_cache
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
 from . import config, google_ai, store
@@ -170,14 +173,54 @@ def subtitle_groups(words, count):
     return groups
 
 
+@lru_cache(maxsize=32)
+def libass_size_scale(font_name):
+    """Factor to multiply an ASS Fontsize by so the exported caption matches the
+    on-screen preview for this font.
+
+    Browsers size text by the em (unitsPerEm), but libass scales a font so that
+    its OS/2 win-metrics (winAscent + winDescent) map to the ASS Fontsize. Fonts
+    whose win-metrics exceed their em therefore render far smaller in the export
+    than in the CSS preview — e.g. Google Sans declares 1509+1079 against a
+    1000-unit em (2.59x), so at Fontsize 64 its em renders at only ~25px. Reading
+    the exact file fontconfig would hand libass and returning
+    (winAscent+winDescent)/unitsPerEm makes the rendered em equal the intended
+    pixel size for every font. Falls back to 1.0 on any problem (current
+    behaviour), so a missing/odd font can never make captions vanish."""
+    try:
+        out = subprocess.run(['fc-match', '-f', '%{file}', f'{font_name}:bold'],
+                             capture_output=True, text=True, timeout=10)
+        path = out.stdout.strip()
+        if not path or not Path(path).exists():
+            return 1.0
+        data = Path(path).read_bytes()
+        count = struct.unpack('>H', data[4:6])[0]
+        tables = {}
+        for i in range(count):
+            entry = 12 + i * 16
+            tag = data[entry:entry + 4].decode('latin1')
+            tables[tag] = struct.unpack('>I', data[entry + 8:entry + 12])[0]
+        upm = struct.unpack('>H', data[tables['head'] + 18:tables['head'] + 20])[0]
+        win_asc, win_desc = struct.unpack('>HH', data[tables['OS/2'] + 74:tables['OS/2'] + 78])
+        if not upm or not (win_asc + win_desc):
+            return 1.0
+        return min(3.0, max(1.0, (win_asc + win_desc) / upm))
+    except Exception:
+        return 1.0
+
+
 def make_ass(words, clip, settings, target):
     selected = [{**w, 'start': max(0, w['start'] - clip['start']), 'end': min(clip['end'], w['end']) - clip['start']} for w in words if w['end'] > clip['start'] and w['start'] < clip['end']]
     color = settings['caption_color'].lstrip('#')
     color = color[4:6] + color[2:4] + color[:2]
+    caption_font = settings.get("caption_font", "DejaVu Sans")
+    # Match the export to the CSS preview regardless of the font's win-metrics.
+    caption_fs = round(settings["caption_size"] * libass_size_scale(caption_font))
+    hook_fs = round(76 * libass_size_scale("Barlow"))
     lines = ['[Script Info]', 'ScriptType: v4.00+', 'PlayResX: 1080', 'PlayResY: 1920', 'WrapStyle: 0',
              '[V4+ Styles]', 'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-             f'Style: Default,{settings.get("caption_font","DejaVu Sans")},{settings["caption_size"]},&H00FFFFFF,&H00FFFFFF,&H{"80101010" if settings.get("caption_box") else "00101010"},&H80000000,-1,0,0,0,100,100,0,0,{3 if settings.get("caption_box") else 1},{8 if settings.get("caption_box") else 4},1,5,85,140,0,1',
-             f'Style: Hook,Barlow,76,&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,5,100,100,0,1',
+             f'Style: Default,{caption_font},{caption_fs},&H00FFFFFF,&H00FFFFFF,&H{"80101010" if settings.get("caption_box") else "00101010"},&H80000000,-1,0,0,0,100,100,0,0,{3 if settings.get("caption_box") else 1},{8 if settings.get("caption_box") else 4},1,5,85,140,0,1',
+             f'Style: Hook,Barlow,{hook_fs},&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,5,100,100,0,1',
              '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text']
     if clip.get('title') and settings.get('main_title_enabled'):
         c=settings.get('main_title_color','#ffffff').lstrip('#');c=c[4:6]+c[2:4]+c[:2]
