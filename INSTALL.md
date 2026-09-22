@@ -3,7 +3,7 @@
 Hướng dẫn cài TalkCut Studio lên máy Windows ở nhà. Toàn bộ ứng dụng chạy trong
 Docker nên **không cần cài Python / Node / FFmpeg** — chỉ cần Docker Desktop.
 
-Có 2 cách. Nếu chỉ muốn thử nhanh tối nay → dùng **Cách 1** (bộ cài dựng sẵn).
+Có 3 cách. Đơn giản nhất → **Cách 1** (bộ cài một file `.exe`, có shortcut).
 
 ---
 
@@ -14,13 +14,35 @@ Có 2 cách. Nếu chỉ muốn thử nhanh tối nay → dùng **Cách 1** (b�
    rồi khởi động lại máy.
 3. Mở Docker Desktop, chờ tới khi góc dưới bên trái báo **"Engine running"**.
 
-> Máy cần khoảng **8 GB RAM** trở lên và ~10 GB trống trên ổ đĩa.
+> Máy cần khoảng **8 GB RAM** trở lên và ~10 GB trống trên ổ đĩa. Docker Desktop
+> **không nằm trong** bộ cài (giấy phép của Docker không cho đóng gói lại, và
+> Docker cần quyền admin + WSL2 khi cài lần đầu). Nếu chưa có Docker, bộ cài
+> `.exe` sẽ tự nhắc và mở trang tải Docker chính chủ.
 
 ---
 
-## Cách 1 — Bộ cài dựng sẵn (nhanh, khuyên dùng để thử tối nay)
+## Cách 1 — Bộ cài một file `.exe` (khuyên dùng)
 
-Cách này dùng image đã build sẵn nên **không phải chờ build ~20 phút**.
+File **`TalkCutStudio-Setup.exe`** (~2GB) đã gói sẵn ứng dụng + image dựng sẵn.
+
+1. Copy `TalkCutStudio-Setup.exe` sang máy, **nhấp đúp** để cài (không cần quyền
+   admin — cài vào thư mục người dùng).
+2. Cài xong sẽ có **lối tắt "TalkCut Studio"** trên **Desktop** và **Start Menu**.
+3. Nhấp đúp lối tắt để chạy. Lần đầu: mở Notepad để dán **GEMINI_API_KEY**, lưu,
+   Enter → tự kiểm tra checksum, nạp image, nhận GPU, mở **http://localhost:8092**.
+4. Những lần sau chỉ cần nhấp lối tắt là chạy ngay.
+
+> Bộ cài chỉ đặt file + tạo lối tắt. Việc nạp image (~vài phút) diễn ra ở **lần
+> chạy đầu tiên** qua lối tắt, cần Docker Desktop đang chạy.
+
+Gỡ cài: **Settings → Apps** (hoặc Start Menu → "Gỡ cài đặt") — chỉ xoá file ứng
+dụng, **không** xoá dữ liệu/clip (nằm trong Docker volume).
+
+---
+
+## Cách 2 — Thư mục dựng sẵn (không cần bộ cài `.exe`)
+
+Dùng image đã build sẵn, chạy trực tiếp bằng `start.bat`, không phải build.
 
 Toàn bộ bộ cài đã được đóng gói sẵn trong **một thư mục**:
 `dist\talkcut-install\` gồm:
@@ -53,7 +75,7 @@ Xong. Những lần sau chỉ cần nhấp `start.bat` là chạy ngay.
 
 ---
 
-## Cách 2 — Dựng từ mã nguồn (không cần chép file 2GB)
+## Cách 3 — Dựng từ mã nguồn (không cần chép file 2GB)
 
 Dùng khi máy nhà có internet và bạn muốn tải mã nguồn về build tại chỗ.
 
@@ -64,7 +86,7 @@ Dùng khi máy nhà có internet và bạn muốn tải mã nguồn về build t
    cd Talkcut
    ```
 3. Nhấp đúp **`start.bat`** (hoặc chạy `scripts\start.sh` trong Git Bash).
-4. Điền `GEMINI_API_KEY` vào `.env` như Cách 1.
+4. Điền `GEMINI_API_KEY` vào `.env` như trên.
 5. Lần đầu sẽ **build ~15–20 phút** (biên dịch FFmpeg, tải thư viện CUDA, npm…).
    Các lần sau chạy ngay.
 
@@ -134,14 +156,24 @@ tiện chẩn đoán.
 
 ## (Dành cho người build) Đóng gói lại bộ cài
 
-Sau khi build lại image, tạo lại bộ cài dựng sẵn chỉ bằng một lệnh — nhấp đúp
-**`build-bundle.bat`** ở thư mục gốc dự án (thêm `/build` để build image trước):
+**Tạo bộ cài một file `.exe`** (khuyên dùng) — cài Inno Setup một lần
+(`winget install JRSoftware.InnoSetup`), rồi nhấp đúp **`build-installer.bat`** ở
+thư mục gốc dự án (tự đóng gói image nếu chưa có; thêm `/build` để build image
+trước):
 
 ```bat
-build-bundle.bat            REM đóng gói image :latest hiện có
+build-installer.bat          REM tạo dist\TalkCutStudio-Setup.exe (~2GB)
+build-installer.bat /build   REM build image từ mã nguồn rồi tạo .exe
+```
+
+**Chỉ tạo thư mục dựng sẵn** (không cần Inno Setup) — nhấp đúp **`build-bundle.bat`**:
+
+```bat
+build-bundle.bat            REM đóng gói image :latest hiện có -> dist\talkcut-install\
 build-bundle.bat /build     REM build image từ mã nguồn rồi đóng gói
 ```
 
-Kết quả nằm ở `dist\talkcut-install\` (đã gồm `.tar.gz` + `.sha256` + launcher +
-compose + INSTALL.md). Copy cả thư mục đó sang máy đích.
+`build-bundle` cho ra `dist\talkcut-install\` (`.tar.gz` + `.sha256` + launcher +
+compose + INSTALL.md). `build-installer` gói chính thư mục đó thành một file `.exe`
+kèm lối tắt. File `.exe` và thư mục bundle nằm trong `dist\` (đã bị git bỏ qua).
 

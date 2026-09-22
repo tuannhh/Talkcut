@@ -14,7 +14,7 @@ cp .env.example .env
 
 Nếu `.env` đã tồn tại, giữ nguyên file và chạy `./scripts/start.sh`. Docker Desktop cần đang chạy. Dữ liệu nằm trong Docker volume `talkcut-studio_studio-data`, được giữ khi khởi động lại hoặc build lại. Cổng chỉ mở trên máy local. Không chạy nhiều worker Uvicorn cho phiên bản này.
 
-**Trên Windows:** nhấp đúp `start.bat` (tự bật Docker, tạo `.env`, nhận diện GPU, mở trình duyệt). Xem hướng dẫn cài chi tiết — kể cả bộ cài dựng sẵn để mang sang máy khác — tại [INSTALL.md](INSTALL.md).
+**Trên Windows:** có bộ cài một file `TalkCutStudio-Setup.exe` — nhấp đúp để cài, tạo lối tắt trên Desktop/Start Menu, chạy bằng một cú nhấp. Hoặc nhấp đúp `start.bat` trong thư mục dựng sẵn (tự bật Docker, tạo `.env`, nhận diện GPU, mở trình duyệt). Xem chi tiết + cách tạo bộ cài tại [INSTALL.md](INSTALL.md).
 
 Các model mặc định:
 

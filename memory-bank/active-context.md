@@ -567,3 +567,33 @@ tar after any image rebuild. Home PC's GPU status unknown — launcher handles b
   a771b95831b6dbbb47934c93e52810738e4faa2641b6299146293715b67f48a6; start.ps1's
   verify logic reproduces that hash (MATCH); `docker load` of the fresh tar
   restored both `:latest` images without disturbing the running stack.
+
+### One-click Windows installer .exe (2026-09-22, follow-up)
+
+User asked for a single-file installer (Docker inside? one-click + shortcut).
+Answered honestly: Docker Desktop can't be embedded (license forbids
+redistribution; first install needs admin+WSL2+reboot; and Docker Desktop needs
+a paid license for large orgs like MISA — free engines exist). Built instead an
+Inno Setup offline installer that lays down the app + pre-built 2GB image and
+creates shortcuts; Docker stays a prerequisite the installer detects.
+
+- `installer/talkcut.iss` (Inno Setup 6): installs to `{localappdata}\Programs\
+  TalkCut Studio` with `PrivilegesRequired=lowest` (user-writable so start.ps1's
+  .env write needs no admin/UAC). `DefaultGroupName={#MyAppName}` (without it the
+  Start Menu group came out literally named "(Default)" — caught in testing).
+  Desktop (task-gated) + Start Menu shortcuts to start.bat with talkcut.ico. Tar
+  shipped `nocompression` (already .gz). `[Code]` detects Docker via
+  `{commonpf}\Docker\Docker\...` and offers to open the official download page if
+  missing. First `docker load` happens on first launch (start.ps1), not install.
+- `installer/build-installer.ps1` + root `build-installer.bat`: ensure the bundle
+  exists (run build-bundle if not), find ISCC (winget id JRSoftware.InnoSetup;
+  installed to `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`), compile ->
+  `dist\TalkCutStudio-Setup.exe` (~2GB).
+- `installer/talkcut.ico`: generated with PIL (orange #ff7300 rounded square +
+  white play triangle, 16..256px multi-size).
+- Output `dist\TalkCutStudio-Setup.exe` is gitignored (/dist/). Installer SOURCES
+  (.iss, .ps1, .bat, .ico) are committed.
+- VERIFIED end-to-end twice: silent install (/VERYSILENT /DIR=temp) -> all files
+  land incl. 2GB tar + unins000.exe; Desktop + Start Menu "TalkCut Studio" group
+  with 3 shortcuts, correct target(start.bat)/workdir/icon; silent uninstall ->
+  app dir, desktop lnk, start-menu group all removed clean.
