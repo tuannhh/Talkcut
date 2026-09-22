@@ -2,6 +2,8 @@
 data/
 node_modules/
 frontend/dist/
+# Bo cai dung san (image tar ~2GB + bundle) — khong commit vao git.
+/dist/
 __pycache__/
 .pytest_cache/
 *.pyc

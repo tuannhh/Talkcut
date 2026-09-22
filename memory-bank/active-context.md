@@ -518,3 +518,36 @@ build/install size.
   cuDNN sublibraries is GPU/arch-specific and risky to ship blind. Flagged to the
   user as the big remaining lever (a CPU-only face-engine variant would drop
   ~2.5GB for GPU-less target devices) — their call.
+
+## Windows installer bundle (2026-09-22)
+
+User: keep CUDA as-is ("phần CUDA để nguyên nhé"), do a handoff, and build a
+complete installer so they can try it on their Windows home PC tonight.
+
+Deliverables (committed to repo):
+- `start.bat` (repo root) — double-click entry; runs `scripts/start.ps1` via
+  `powershell -ExecutionPolicy Bypass`.
+- `scripts/start.ps1` — Windows twin of `scripts/start.sh`: auto-starts Docker
+  Desktop and waits for the engine; creates `.env` from `.env.example` and opens
+  Notepad on first run; loads a pre-built image tar (`talkcut-images*.tar.gz`) if
+  images are missing; auto-detects NVIDIA GPU (nvidia-smi + `docker info`
+  contains `nvidia`) and adds `compose.gpu.yaml`, with CPU fallback if a GPU
+  `up` fails; `--no-build` when images exist else `--build`; waits on
+  `/api/health` then opens the browser. Parse-checked; every detection branch
+  dry-run-verified on this machine (Docker up, both images present, GPU overlay
+  true, PORT 8092, health 200); compose splatting idempotent on the live stack.
+- `stop.bat` — `docker compose down` (keeps the volume/data).
+- `INSTALL.md` — Vietnamese guide: Docker Desktop prereq, Cách 1 pre-built
+  bundle (fast) vs Cách 2 build-from-source, .env/API-key, optional GPU via
+  WSL2, use/stop/update, troubleshooting.
+- `.env.example`: `SOURCE_DIR` default changed from the macOS path
+  `/Users/tuanbui/Downloads` to portable `./sources` (the old default would
+  break the Windows bind-mount); only affects a freshly generated `.env`.
+- `.gitignore`: added `/dist/` so the image tar/bundle is never committed.
+
+Pre-built bundle (NOT in git — lives in `dist/talkcut-install/`, ~2.0GB):
+`docker save talkcut-studio-studio:latest talkcut-face-engine:latest | gzip`
+= `talkcut-images.tar.gz` (5.86GB -> 2.0GB, gzip integrity + RepoTags verified)
+plus start.bat/stop.bat/compose*/.env.example/scripts/start.ps1/INSTALL.md. User
+copies this one folder to the home PC and double-clicks start.bat. Regenerate the
+tar after any image rebuild. Home PC's GPU status unknown — launcher handles both.
