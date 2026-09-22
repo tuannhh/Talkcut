@@ -30,7 +30,7 @@ export function QuickEditor({clip,api,post,media,jobs,notify,onApply,onSubject,o
    <label className="quick-checkbox"><input type="checkbox" checked={!!clip.settings.stacked_enabled} disabled={busy} onChange={e=>setting('stacked_enabled',e.target.checked)}/>Ghép khung chồng khi quay cảnh toàn hai người</label>
    {clip.settings.stacked_enabled&&<>
     <p className="helper">Người ở bước 1 giữ vị trí trên. Chọn thêm người sẽ đứng dưới; AI sẽ tự tìm các đoạn cảnh toàn thấy rõ cả hai để ghép khung, cảnh khác giữ khung đơn như bình thường.</p>
-    {!clip.settings.tracking_subject&&<p role="status">Chọn người ở bước trên trước.</p>}
+    {!clip.settings.tracking_subject&&<p role="alert" className="quick-warn">Chưa chọn người đứng trên (ở bước 1) nên chưa thể ghép khung — video sẽ giữ khung đơn cho tới khi bạn chọn đủ cả hai người.</p>}
     <TrackingSubjects clip={clip} api={api} media={media} jobs={jobs} onSelect={onSecondSubject} disabled={busy||stackedPending} field="tracking_subject_2" title="Chọn người đứng dưới" helper="Chọn một khuôn mặt khác với người ở trên." selectedHelper="Đã chọn người đứng dưới cho khung ghép."/>
     {stackedPending&&<div className="quick-progress" role="status"><p>{stackedJob.message}</p><progress max="100" value={stackedJob.progress}/></div>}
     {stackedJob?.status==='failed'&&<p role="alert">{stackedJob.error}</p>}
