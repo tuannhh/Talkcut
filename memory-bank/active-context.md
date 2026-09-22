@@ -446,3 +446,44 @@ Diagnosed, NOT yet fixed (need a re-render + the user's eyes, so deferred):
   `clip['end']` with no tail handling. Proposed a short video+audio
   fade-out (or snapping the end to a word/silence boundary), pending the
   user's preference.
+
+## Review items 2 / 3b / 5 implemented + AV1 CPU-decode fix — 2026-09-22
+
+Finished the three deferred review items and verified each without burning
+Gemini credits, then found and fixed a merge regression that blocked CPU render.
+
+- (2) Freezes: hard cap on pacing holds. `focus.MAX_HOLD_SECONDS = 1.6`;
+  `calm_holds` now uses `limit = min(calm_max_seconds, 1.6)`. A held frame
+  reads as an intentional beat up to ~1.6s; longer inserts are dropped from the
+  hold set and play live (a real listener shot) instead of freezing. The
+  framing slider is clamped to 1–1.6s to match. Verified in-container: the
+  exact 2.0s reaction insert that froze before now yields NO hold (plays live);
+  a 1.4s insert still holds at 1.4s. No hold can exceed 1.6s.
+- (5) End frame: when the clip has no outro, `editor.render` now appends a
+  ~0.4s `fade=t=out` (video) + `afade=t=out` (audio) at the very end
+  (`fade = min(0.4, joined_seconds/6)`), forcing the filter re-encode path.
+  Avoids the cut-off / ugly-mouth last frame. Verified with an ffmpeg smoke
+  test: brightness ramps 70.8->25->0 over the last 0.4s (flat ~125 without),
+  end audio drops to -30 dB.
+- (3b) Stacked trigger: two parts. (a) `QuickEditor.jsx` now warns (amber
+  `.quick-warn`) when stacking is on but the second subject is unset — this was
+  the real cause of "some clips yes, some no" (clips had `stacked_enabled` but
+  a missing `tracking_subject`/`_2`, so render silently skipped). The "0 đoạn"
+  case now reads "chưa tìm thấy cảnh toàn nào" instead of a green "✓ 0 đoạn".
+  (b) Relaxed detection in `stacked_view.py`: `wide_two_shot` max_width
+  .34->.40, min_gap .05->.035; `assemble` quorum .6->.5, min_duration
+  1.0->0.8; `VERSION` bumped stacked-v1->stacked-v2 to invalidate old caches so
+  re-detection runs. Verified: a borderline 37%-face / 4%-gap two-shot is now
+  accepted while a true close-up is still rejected.
+
+- AV1 CPU-decode regression (found while verifying (2)/(3b)/(5) via a real
+  render): the render failed at 0% with "Your platform doesn't support hardware
+  accelerated AV1 decoding". Root cause: the merged from-source ffmpeg has only
+  the native `av1` decoder (hwaccel-only) and `av1_cuvid` (needs a GPU) — no
+  software AV1 decoder, because the build lacked libdav1d (Debian's apt ffmpeg
+  shipped it). So AV1 phone/screen recordings could only render on a GPU,
+  silently breaking the CPU-only path the single image promises. Same class as
+  the earlier libmp3lame regression. Fix: `--enable-libdav1d` + `libdav1d-dev`
+  (build) + `libdav1d6` (runtime) in the root Dockerfile. This machine has an
+  RTX 3050 (face-engine uses it) but the studio container was run CPU-only,
+  which is exactly why it surfaced.

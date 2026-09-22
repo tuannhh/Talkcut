@@ -16,12 +16,12 @@ from . import config
 from .media import ffmpeg, hwaccel_input_args
 
 _lock = threading.RLock()
-VERSION = 'stacked-v1'
+VERSION = 'stacked-v2'
 SEAM_HEIGHT = 300
 SEAM_BLUR = 40
 
 
-def wide_two_shot(box_top, box_bottom, max_width=.34, min_gap=.05):
+def wide_two_shot(box_top, box_bottom, max_width=.40, min_gap=.035):
     """A wide/full camera shot showing both selected people, not a close-up.
 
     Face width is a proxy for shot size: a close-up single-person crop keeps
@@ -70,7 +70,7 @@ def median_box(boxes):
     return [statistics.median(b[i] for b in boxes) for i in range(4)]
 
 
-def assemble(samples, cuts, clip, token_top, token_bottom, min_duration=1.0):
+def assemble(samples, cuts, clip, token_top, token_bottom, min_duration=.8):
     """One representative box per qualifying shot; a locked crop, not a jitter track."""
     duration = clip['end'] - clip['start']
     bounds = [0, *cuts, duration]
@@ -82,7 +82,7 @@ def assemble(samples, cuts, clip, token_top, token_bottom, min_duration=1.0):
         if not group:
             continue
         qualifying = [s for s in group if wide_two_shot(s.get('top'), s.get('bottom'))]
-        if len(qualifying) < max(1, math.ceil(len(group) * .6)):
+        if len(qualifying) < max(1, math.ceil(len(group) * .5)):
             continue
         segments.append({
             'start': a, 'end': b, 'top': token_top, 'bottom': token_bottom,

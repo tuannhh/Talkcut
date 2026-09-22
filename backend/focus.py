@@ -13,6 +13,7 @@ from . import config, google_ai
 from .media import ffmpeg, hwaccel_input_args
 
 VERSION = 'speaker-shots-v2.2'
+MAX_HOLD_SECONDS = 1.6
 KINDS = {'speaker', 'reaction', 'broll', 'wrong_shot', 'broken', 'transition', 'end', 'uncertain'}
 LABELS = {'selected':'Chủ thể đã chọn','speaker': 'Người đang nói', 'reaction': 'Cảnh người nghe', 'broll': 'Cảnh trám', 'wrong_shot': 'Có thể quay nhầm', 'broken': 'Hình lỗi / mất nét', 'transition': 'Chuyển cảnh / lia máy', 'end': 'Kết cảnh', 'uncertain': 'Chưa đủ bằng chứng'}
 
@@ -399,7 +400,11 @@ def calm_holds(track,settings):
         return []
     if not settings.get('calm_short_shots',True):return []
     scenes=track.get('scenes',[]);cuts=track.get('visual_cuts',[]);holds=[]
-    limit=settings.get('calm_max_seconds',4)
+    # A held frame reads as an intentional beat up to ~1.6s; beyond that it
+    # looks like a frozen/broken player. So cap the hold hard, regardless of
+    # the user's calm_max_seconds: inserts longer than the cap are left to play
+    # live (a real listener shot looks natural) rather than frozen for seconds.
+    limit=min(settings.get('calm_max_seconds',4),MAX_HOLD_SECONDS)
     for i,s in enumerate(scenes):
         if not 0<i<len(scenes)-1 or s['kind'] not in ('reaction','wrong_shot','broken','transition') or not .35<=s['end']-s['start']<=limit:continue
         if scenes[i-1]['kind']!='speaker' or scenes[i+1]['kind']!='speaker':continue

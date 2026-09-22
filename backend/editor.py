@@ -365,6 +365,7 @@ def render(source, clip, words, settings, directory, progress):
     ffmpeg(['-f', 'concat', '-safe', '0', '-i', playlist, '-c', 'copy', joined])
     progress('Đang trộn nhạc và áp dụng watermark', 78)
     output = directory / 'final.mp4'
+    joined_seconds = probe(joined)['duration']
     args = ['-i', joined]
     filters, v, a, index = [], '0:v', '0:a', 1
     if settings['watermark_kind'] != 'none':
@@ -388,8 +389,17 @@ def render(source, clip, words, settings, directory, progress):
         voice=a if a.startswith('[') else f'[{a}]'
         filters.append(f'{voice}[cue]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[sfxout]')
         a='[sfxout]'
+    # Không có outro -> kết bằng fade nhẹ để tránh cắt cụt frame cuối / khẩu hình xấu của diễn giả.
+    if not settings['outro_asset'] and joined_seconds > 1:
+        fade = round(min(0.4, joined_seconds / 6), 3)
+        st = round(joined_seconds - fade, 3)
+        vin = v if v.startswith('[') else f'[{v}]'
+        ain = a if a.startswith('[') else f'[{a}]'
+        filters.append(f'{vin}fade=t=out:st={st}:d={fade}[vend]')
+        v = '[vend]'
+        filters.append(f'{ain}afade=t=out:st={st}:d={fade}[aend]')
+        a = '[aend]'
     if filters:
-        joined_seconds = probe(joined)['duration']
         args += ['-filter_complex', ';'.join(filters), '-map', v, '-map', a, '-t', str(joined_seconds), *encode_args(), output]
         ffmpeg_progress(args, joined_seconds, lambda frac: progress('Đang trộn nhạc và áp dụng watermark', 78 + int(frac * 16)))
     else:

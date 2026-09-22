@@ -34,7 +34,8 @@ export function QuickEditor({clip,api,post,media,jobs,notify,onApply,onSubject,o
     <TrackingSubjects clip={clip} api={api} media={media} jobs={jobs} onSelect={onSecondSubject} disabled={busy||stackedPending} field="tracking_subject_2" title="Chọn người đứng dưới" helper="Chọn một khuôn mặt khác với người ở trên." selectedHelper="Đã chọn người đứng dưới cho khung ghép."/>
     {stackedPending&&<div className="quick-progress" role="status"><p>{stackedJob.message}</p><progress max="100" value={stackedJob.progress}/></div>}
     {stackedJob?.status==='failed'&&<p role="alert">{stackedJob.error}</p>}
-    {!stackedPending&&clip.settings.tracking_subject&&clip.settings.tracking_subject_2&&<div className="quick-tracking-state"><p>{stacked?`✓ Đã tìm thấy ${stacked.length} đoạn để ghép khung`:'Đã chọn cả hai người — chuẩn bị để AI tìm đoạn ghép khung.'}</p><button disabled={busy} onClick={onPrepareStacked}>{stacked?'Tìm lại đoạn ghép khung':'Chuẩn bị ghép khung'}</button></div>}
+    {!stackedPending&&clip.settings.tracking_subject&&!clip.settings.tracking_subject_2&&<p role="alert" className="quick-warn">Chưa chọn người đứng dưới nên chưa thể ghép khung — video sẽ giữ khung đơn cho tới khi bạn chọn đủ hai người.</p>}
+    {!stackedPending&&clip.settings.tracking_subject&&clip.settings.tracking_subject_2&&<div className="quick-tracking-state"><p>{!stacked?'Đã chọn cả hai người — chuẩn bị để AI tìm đoạn ghép khung.':stacked.length?`✓ Đã tìm thấy ${stacked.length} đoạn để ghép khung`:'Chưa tìm thấy cảnh toàn nào đủ rõ cả hai người trong clip này — video sẽ giữ khung đơn. Bạn có thể bấm tìm lại.'}</p><button disabled={busy} onClick={onPrepareStacked}>{stacked?'Tìm lại đoạn ghép khung':'Chuẩn bị ghép khung'}</button></div>}
    </>}
   </section>
   <section className="quick-step"><div className="quick-step-title"><span>2</span><h3>Chọn phong cách dựng</h3></div>

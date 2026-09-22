@@ -19,7 +19,7 @@ RUN npm run build
 # ffmpeg needed driver >=610; this build only needs >=530.41).
 FROM debian:bookworm-slim AS ffmpeg-build
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git build-essential yasm nasm pkg-config libx264-dev libass-dev libmp3lame-dev zlib1g-dev ca-certificates \
+    git build-essential yasm nasm pkg-config libx264-dev libass-dev libmp3lame-dev libdav1d-dev zlib1g-dev ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 RUN git clone --depth 1 --branch n12.1.14.0 https://github.com/FFmpeg/nv-codec-headers.git \
@@ -33,13 +33,19 @@ WORKDIR /build/ffmpeg
 # audio encode — the analyze pipeline extracts audio-*.mp3 for Google STT
 # (pipeline.py). Debian's packaged ffmpeg shipped this; the from-source
 # build must enable it explicitly or `analyze` fails with "Encoder not found".
-RUN ./configure --enable-gpl --enable-nonfree --enable-cuda --enable-cuvid --enable-nvenc --enable-libx264 --enable-libass --enable-libmp3lame --enable-zlib \
+# --enable-libdav1d: *software* AV1 decode. FFmpeg's built-in `av1` decoder is
+# hwaccel-only (no software path), so without dav1d an AV1 source decodes only
+# on a GPU (av1_cuvid). That silently breaks the CPU-only path this single
+# image promises — AV1 phone/screen recordings fail with "Your platform doesn't
+# support hardware accelerated AV1 decoding". Debian's packaged ffmpeg shipped
+# dav1d; the from-source build must enable it or CPU render of AV1 dies.
+RUN ./configure --enable-gpl --enable-nonfree --enable-cuda --enable-cuvid --enable-nvenc --enable-libx264 --enable-libass --enable-libmp3lame --enable-libdav1d --enable-zlib \
       --disable-doc --disable-debug --disable-ffplay \
     && make -j"$(nproc)" \
     && make install DESTDIR=/build/out
 
 FROM python:3.12-slim-bookworm
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core fontconfig ca-certificates libglib2.0-0 libgl1 libx264-164 libass9 libmp3lame0 zlib1g && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core fontconfig ca-certificates libglib2.0-0 libgl1 libx264-164 libass9 libmp3lame0 libdav1d6 zlib1g && rm -rf /var/lib/apt/lists/*
 COPY --from=ffmpeg-build /build/out/usr/local/bin/ffmpeg /build/out/usr/local/bin/ffprobe /usr/local/bin/
 WORKDIR /app
 COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
