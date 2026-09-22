@@ -57,8 +57,21 @@ $studioImg = 'talkcut-studio-studio:latest'
 $faceImg   = 'talkcut-face-engine:latest'
 if (-not (Have-Image $studioImg) -or -not (Have-Image $faceImg)) {
   $tar = Get-ChildItem -Path $root -Filter 'talkcut-images*.tar*' -File -ErrorAction SilentlyContinue |
+         Where-Object { $_.Name -notlike '*.sha256' } |
          Sort-Object Length -Descending | Select-Object -First 1
   if ($tar) {
+    # Kiem tra toan ven neu co file .sha256 di kem (chong loi copy 2GB qua USB/cloud).
+    $sum = Join-Path $tar.DirectoryName ($tar.Name + '.sha256')
+    if (Test-Path $sum) {
+      Info 'Dang kiem tra toan ven file image (SHA-256)...'
+      $want = (((Get-Content -Raw $sum).Trim()) -split '\s+')[0].ToLower()
+      $have = (Get-FileHash -Algorithm SHA256 $tar.FullName).Hash.ToLower()
+      if ($want -and $want -ne $have) {
+        Fail 'File image bi hong khi sao chep (checksum khong khop). Hay copy lai talkcut-images.tar.gz roi thu lai.'
+        Read-Host 'Nhan Enter de thoat'; exit 1
+      }
+      Ok 'Checksum khop - file nguyen ven.'
+    }
     Info ('Dang nap image tu ' + $tar.Name + ' (~2GB, co the mat vai phut)...')
     docker load -i $tar.FullName
     if ($LASTEXITCODE -ne 0) { Fail 'Nap image that bai.'; Read-Host 'Nhan Enter de thoat'; exit 1 }

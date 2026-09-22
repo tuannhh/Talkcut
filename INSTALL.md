@@ -22,8 +22,8 @@ Có 2 cách. Nếu chỉ muốn thử nhanh tối nay → dùng **Cách 1** (b�
 
 Cách này dùng image đã build sẵn nên **không phải chờ build ~20 phút**.
 
-Bạn cần copy về máy nhà **thư mục bộ cài** gồm các file/thư mục sau (lấy từ thư
-mục dự án hiện tại):
+Toàn bộ bộ cài đã được đóng gói sẵn trong **một thư mục**:
+`dist\talkcut-install\` gồm:
 
 ```
 start.bat
@@ -32,21 +32,22 @@ compose.yaml
 compose.gpu.yaml
 .env.example
 scripts\start.ps1
-talkcut-images.tar.gz        <-- file image ~2GB (nằm trong thư mục dist\)
+talkcut-images.tar.gz          <-- image dựng sẵn (~2GB)
+talkcut-images.tar.gz.sha256   <-- checksum để tự kiểm tra file khi copy
+INSTALL.md
 ```
-
-> `talkcut-images.tar.gz` nằm ở `dist\talkcut-images.tar.gz`. Copy nó ra **cùng
-> cấp** với `start.bat` (thư mục gốc bộ cài), đừng để trong `dist\`.
 
 Các bước ở máy nhà:
 
-1. Copy cả thư mục bộ cài (kèm file `.tar.gz`) vào máy, ví dụ `C:\TalkCut`.
+1. Copy **cả thư mục `talkcut-install`** (giữ nguyên cấu trúc, kèm cả 2 file
+   `.tar.gz` và `.sha256`) vào máy, ví dụ `C:\TalkCut`.
 2. Nhấp đúp **`start.bat`**.
 3. Lần đầu, script sẽ tạo file `.env` và **mở Notepad** — dán **GEMINI_API_KEY**
    của bạn vào dòng `GEMINI_API_KEY=`, lưu lại (Ctrl+S), đóng Notepad, quay lại
    cửa sổ đen nhấn **Enter**.
-4. Script tự nạp image (~vài phút cho lần đầu), tự phát hiện GPU, rồi mở trình
-   duyệt tại **http://localhost:8092**.
+4. Script tự kiểm tra checksum (báo ngay nếu file bị hỏng khi copy), nạp image
+   (~vài phút cho lần đầu), tự phát hiện GPU, rồi mở trình duyệt tại
+   **http://localhost:8092**.
 
 Xong. Những lần sau chỉ cần nhấp `start.bat` là chạy ngay.
 
@@ -128,3 +129,19 @@ GPU (render NVENC + nhận diện khuôn mặt CUDA):
 
 Nếu kẹt ở bước nào, chụp lại nội dung cửa sổ đen (hoặc `docker compose logs`) để
 tiện chẩn đoán.
+
+---
+
+## (Dành cho người build) Đóng gói lại bộ cài
+
+Sau khi build lại image, tạo lại bộ cài dựng sẵn chỉ bằng một lệnh — nhấp đúp
+**`build-bundle.bat`** ở thư mục gốc dự án (thêm `/build` để build image trước):
+
+```bat
+build-bundle.bat            REM đóng gói image :latest hiện có
+build-bundle.bat /build     REM build image từ mã nguồn rồi đóng gói
+```
+
+Kết quả nằm ở `dist\talkcut-install\` (đã gồm `.tar.gz` + `.sha256` + launcher +
+compose + INSTALL.md). Copy cả thư mục đó sang máy đích.
+

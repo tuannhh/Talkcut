@@ -551,3 +551,19 @@ Pre-built bundle (NOT in git — lives in `dist/talkcut-install/`, ~2.0GB):
 plus start.bat/stop.bat/compose*/.env.example/scripts/start.ps1/INSTALL.md. User
 copies this one folder to the home PC and double-clicks start.bat. Regenerate the
 tar after any image rebuild. Home PC's GPU status unknown — launcher handles both.
+
+### Repackaging tool + integrity (2026-09-22, follow-up)
+
+- `build-bundle.bat` -> `scripts/build-bundle.ps1` (maintainer tool, not shipped):
+  one command rebuilds `dist/talkcut-install/`. `-Build`/`/build` optionally runs
+  `docker compose build` first. Uses `docker save -o` (never a PowerShell binary
+  pipe, which corrupts) then compresses with Git's gzip if found
+  (`C:\Program Files\Git\usr\bin\gzip.exe`), else .NET GZipStream; writes a
+  `talkcut-images.tar.gz.sha256` (sha256sum format via Get-FileHash).
+- `scripts/start.ps1`: before `docker load` it now verifies the tar against the
+  adjacent `.sha256` (Get-FileHash) and hard-stops on mismatch — catches a
+  corrupt 2GB USB/cloud copy up front. Glob excludes the `.sha256` file itself.
+- Dogfooded: build-bundle produced a 1.99GB tar, SHA-256
+  a771b95831b6dbbb47934c93e52810738e4faa2641b6299146293715b67f48a6; start.ps1's
+  verify logic reproduces that hash (MATCH); `docker load` of the fresh tar
+  restored both `:latest` images without disturbing the running stack.
