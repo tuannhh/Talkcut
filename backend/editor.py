@@ -376,26 +376,34 @@ def render(source, clip, words, settings, directory, progress):
     if settings['crop_mode']=='manual':
         from .static_framing import cached_track
         track=cached_track(source,clip)
-    vf = crop_filter(info, settings, track)
-    from .transitions import transition_plan,visual_filters
-    pacing=transition_plan(track,info,settings)
-    vf += ','+visual_filters(pacing,settings.get('mix_seconds',.24))
-    if settings.get('stacked_enabled') and settings.get('tracking_subject') and settings.get('tracking_subject_2'):
-        from .stacked_view import detect as detect_stacked, wrap as wrap_stacked
-        stacked = detect_stacked(source, clip, progress)
-        if stacked['segments']:
-            vf = wrap_stacked(vf, stacked['segments'], info, settings)
+    captions = None
     if settings['caption_enabled'] or settings.get('main_title_enabled'):
         if settings['caption_enabled'] and not words:
             raise ValueError('Chưa có transcript. Phân tích nguồn trước hoặc tắt phụ đề.')
-        make_ass(words, clip, settings, directory / 'captions.ass')
         # Generated UUID-only paths under DATA; no user text enters filter syntax.
-        escaped = str(directory / 'captions.ass').replace('\\', '\\\\').replace(':', '\\:').replace("'", "'\\''")
-        vf += f",ass='{escaped}':fontsdir='{Path(__file__).parent / 'fonts'}'"
+        captions = directory / 'captions.ass'
+        make_ass(words, clip, settings, captions)
+    main_seconds, af = clip['end'] - clip['start'], 'aresample=48000,apad'
+    if track and track.get('director'):
+        from . import director
+        # Same prepared plan the preview reads: framing, stacked two-shots, jump cuts.
+        track = director.prepare(track, info, settings)
+        vf = director.video_filter(info, settings, track, captions)
+        if track['removed']:
+            af, main_seconds = director.audio_filter(track['removed'], main_seconds), track['kept_duration']
+    else:
+        vf = crop_filter(info, settings, track)
+        from .transitions import transition_plan,visual_filters
+        pacing=transition_plan(track,info,settings)
+        vf += ','+visual_filters(pacing,settings.get('mix_seconds',.24))
+        if captions:
+            escaped = str(captions).replace('\\', '\\\\').replace(':', '\\:').replace("'", "'\\''")
+            vf += f",ass='{escaped}':fontsdir='{Path(__file__).parent / 'fonts'}'"
     progress('Đang dựng nội dung và phụ đề karaoke Full HD', 42)
-    main_seconds = clip['end'] - clip['start']
-    ffmpeg_progress(['-ss', str(clip['start']), *hwaccel_input_args(), '-i', source, '-t', str(main_seconds), '-vf', vf,
-                     '-af', 'aresample=48000,apad', *encode_args(), directory / 'main.mp4'],
+    # Input -t ends decoding at the clip end: after select drops frames, the
+    # output -t alone would keep reading the rest of a long source.
+    ffmpeg_progress(['-ss', str(clip['start']), '-t', str(clip['end'] - clip['start']), *hwaccel_input_args(), '-i', source,
+                     '-t', str(main_seconds), '-vf', vf, '-af', af, *encode_args(), directory / 'main.mp4'],
                     main_seconds, lambda frac: progress('Đang dựng nội dung và phụ đề karaoke Full HD', 42 + int(frac * 22)))
     parts.append(directory / 'main.mp4')
     if settings['outro_asset']:

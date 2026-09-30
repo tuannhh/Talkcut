@@ -17,12 +17,28 @@ test('direct sentence editing preserves anchors through replacement insertion de
  assert.equal(replaceTimedGroup(w,w.slice(1,3),'là công dân').map(x=>x.text).join(' '),'Tôi là công dân Việt');
 });
 
-test('stacked geometry keeps a tight bust crop inside the frame',async()=>{
- const {stackedGeometry}=await import('./studio-helpers.mjs');
- const g=stackedGeometry({width:1920,height:1080},{crop_zoom:1},[.05,.1,.2,.3]);
- assert.ok(g.cw>0&&g.ch>0);
- assert.ok(Math.abs(g.ch/g.cw-8/9)<.02);
- assert.ok(g.x>=g.cw/2/1920&&g.x<=1-g.cw/2/1920);
+test('tightened pauses are skipped in preview and shift the output clock',async()=>{
+ const {removedAt,outputTime}=await import('./studio-helpers.mjs');
+ const removed=[[2,2.5],[4,5]];
+ assert.equal(removedAt(removed,1.9),null);
+ assert.deepEqual(removedAt(removed,2.1),[2,2.5]);
+ assert.equal(removedAt(removed,5),null);
+ assert.equal(outputTime(removed,1),1);
+ assert.equal(outputTime(removed,3),2.5);
+ assert.equal(outputTime(removed,4),3.5);
+ assert.equal(outputTime(removed,4.5),3.5);
+ assert.equal(outputTime(removed,6),4.5);
+});
+test('director keyframes pan linearly while legacy ones jump on large moves',()=>{
+ const p=[{time:0,x:.2,y:.5,scene:0,mode:'crop'},{time:2,x:.6,y:.5,scene:0,mode:'crop'}];
+ assert.ok(Math.abs(focusAt(p,1,true).x-.4)<1e-9);
+ assert.equal(focusAt(p,1).x,.2);
+});
+test('source rectangle maps renderer pixels onto the preview video and clamps',async()=>{
+ const {sourceRect}=await import('./studio-helpers.mjs');
+ const r=sourceRect({width:3840,height:2160},{width:1920,height:1080},{x:.99,y:.5,cw:1080,ch:1920});
+ assert.equal(r.w,540);assert.equal(r.h,960);
+ assert.equal(r.x,1920-540);assert.equal(r.y,60);
 });
 test('stacked window lookup finds the active AI-chosen segment',async()=>{
  const {stackedWindowAt}=await import('./studio-helpers.mjs');

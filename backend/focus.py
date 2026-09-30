@@ -15,7 +15,7 @@ from .media import ffmpeg, hwaccel_input_args
 VERSION = 'speaker-shots-v2.2'
 MAX_HOLD_SECONDS = 1.6
 KINDS = {'speaker', 'reaction', 'broll', 'wrong_shot', 'broken', 'transition', 'end', 'uncertain'}
-LABELS = {'selected':'Chủ thể đã chọn','speaker': 'Người đang nói', 'reaction': 'Cảnh người nghe', 'broll': 'Cảnh trám', 'wrong_shot': 'Có thể quay nhầm', 'broken': 'Hình lỗi / mất nét', 'transition': 'Chuyển cảnh / lia máy', 'end': 'Kết cảnh', 'uncertain': 'Chưa đủ bằng chứng'}
+LABELS = {'selected':'Chủ thể đã chọn','speaker': 'Người đang nói', 'reaction': 'Cảnh người nghe', 'broll': 'Cảnh trám', 'wrong_shot': 'Có thể quay nhầm', 'broken': 'Hình lỗi / mất nét', 'transition': 'Chuyển cảnh / lia máy', 'end': 'Kết cảnh', 'uncertain': 'Chưa đủ bằng chứng', 'stacked': 'Ghép khung khách mời / MC', 'empty': 'Toàn cảnh trên nền mờ'}
 
 
 def cache_dir(source, clip):
@@ -29,7 +29,9 @@ def cache_dir(source, clip):
 
 
 def cached(source, clip):
-    with _layout_lock:return _cached(source,clip)
+    """Automatic framing now comes from the local AI director (backend/director.py)."""
+    from .director import cached as director_cached
+    return director_cached(source, clip)
 
 
 def _cached(source, clip):
@@ -187,6 +189,11 @@ def refine(proxy, scenes):
 
 
 def analyze(source, clip, progress, words=None):
+    from .director import analyze as direct
+    return direct(source, clip, progress, words)
+
+
+def legacy_analyze(source, clip, progress, words=None):
     directory=cache_dir(source,clip); directory.mkdir(parents=True,exist_ok=True)
     found=cached(source,clip)
     if found:
@@ -267,6 +274,9 @@ def enrich_reactions(directory, result):
 def prepared_track(track, info, settings):
     if settings.get('crop_mode')=='manual':
         from .static_framing import prepare
+        return prepare(track,info,settings)
+    if track.get('director'):
+        from .director import prepare
         return prepare(track,info,settings)
     import statistics
     raw=[dict(p) for p in track['keyframes']] if track.get('reference_tracking') else camera_points(track)

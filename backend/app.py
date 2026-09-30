@@ -393,37 +393,20 @@ def preview_tts(body: VoicePreviewRequest):
 
 
 @app.get('/api/clips/{id}/focus')
-def get_focus(id: str, zoom: float | None = Query(None, ge=1, le=2), subject: str | None = None):
+def get_focus(id: str, zoom: float | None = Query(None, ge=1, le=2), stacked: bool | None = None, trim: bool | None = None,
+              punch: bool | None = None, swap: bool | None = None):
     clip = store.get(id, 'clip')
-    # This query is the unsaved auto-tracking draft. Do not prepare it with
-    # the persisted manual coordinates from the previous editing mode.
-    if subject is not None:clip={**clip,'settings':{**clip.get('settings',{}),'tracking_subject':subject or None,'crop_mode':'auto'}}
-    if subject:
-        from .subject_tracking import reference
-        reference(config.DATA/store.get(clip['source_id'],'source')['path'],subject)
-    if zoom is not None:clip={**clip,'settings':{**clip.get('settings',{}),'crop_zoom':zoom}}
+    # The query carries the unsaved draft toggles, so the preview shows exactly
+    # what exporting these settings would render. This is the automatic plan:
+    # never prepare it with the persisted coordinates of another crop mode.
+    draft = {k: v for k, v in {'crop_zoom': zoom, 'stacked_enabled': stacked, 'silence_trim': trim, 'punch_in': punch, 'swap_roles': swap}.items() if v is not None}
+    settings = {**Settings.model_validate(clip.get('settings', {})).model_dump(), **draft, 'crop_mode': 'auto'}
     source = store.get(clip['source_id'], 'source')
     plan = focusing.cached(config.DATA / source['path'], clip)
     if plan:
-        settings=Settings.model_validate(clip.get('settings',{})).model_dump()
-        plan=focusing.prepared_track(plan,source,settings)
-        plan['holds']=focusing.calm_holds(plan,settings)
-        # Ordinary non-reference pacing can still make a short reaction hold.
-        # Selected-subject tracking returns no holds, so it never reaches this
-        # path and never freezes a portrait over moving source footage.
-        from .intro_art import freeze
-        directory=focusing.cache_dir(config.DATA/source['path'],clip)
-        for h in plan['holds']:
-            if h.get('path'):continue
-            path=directory/f'hold-v6-{h["frame_time"]:.3f}-{settings["crop_zoom"]}.jpg'
-            if not path.exists():
-                temp=path.with_name(uuid.uuid4().hex+'.jpg')
-                freeze(config.DATA/source['path'],{**clip,'settings':settings},clip['start']+h['frame_time'],temp);temp.replace(path)
-            h['path']=str(path.relative_to(config.DATA))
-    preview_plan=None
-    # Never run hundreds of video seeks synchronously just to open a clip.
-    # A plan is prepared explicitly; an unprepared crop is not a verified preview.
-    return {'plan':plan,'preview_plan':preview_plan,'labels':focusing.LABELS}
+        plan = focusing.prepared_track(plan, source, settings)
+    # Analysis runs as queued work; opening a clip never blocks on video decoding.
+    return {'plan': plan, 'preview_plan': None, 'labels': focusing.LABELS}
 
 
 @app.post('/api/clips/{id}/static-framing')

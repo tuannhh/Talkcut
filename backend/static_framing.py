@@ -4,9 +4,14 @@ from . import focus
 
 
 def cached_track(source, clip):
+    """Camera cuts observed by the AI director (or a legacy plan); no inferred motion."""
+    from .director import cached
+    track=cached(source,clip)
     path=focus.cache_dir(source,clip)/'focus.json'
-    if path.exists():return json.loads(path.read_text())
-    return {'start':clip['start'],'end':clip['end'],'keyframes':[], 'visual_cuts':[], 'scenes':[]}
+    if not track and path.exists():track=json.loads(path.read_text())
+    if not track:return {'start':clip['start'],'end':clip['end'],'keyframes':[], 'visual_cuts':[], 'scenes':[]}
+    return {'start':clip['start'],'end':clip['end'],'keyframes':[],'scenes':[],
+            **{k:track[k] for k in ('visual_cuts','speech_turns','source_fps') if k in track}}
 
 
 def at(settings, absolute_time):

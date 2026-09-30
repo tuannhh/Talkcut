@@ -179,7 +179,13 @@ async function describe(buffer) {
   const described = [];
   for (const face of candidates) {
     if (face.box[2] < MIN_FACE || face.box[3] < MIN_FACE) continue;
-    described.push({ score: Number(face.score.toFixed(4)), box: [face.box[0] / width, face.box[1] / height, (face.box[0] + face.box[2]) / width, (face.box[1] + face.box[3]) / height].map(value => Math.max(0, Math.min(1, value))), embedding: await embed(aligned(rgb, width, height, face.kps)) });
+    described.push({
+      score: Number(face.score.toFixed(4)),
+      box: [face.box[0] / width, face.box[1] / height, (face.box[0] + face.box[2]) / width, (face.box[1] + face.box[3]) / height].map(value => Math.max(0, Math.min(1, value))),
+      // Eyes, nose, mouth corners: composition (eye line, facing direction), not identity.
+      kps: face.kps.map(([x, y]) => [Number((x / width).toFixed(4)), Number((y / height).toFixed(4))]),
+      embedding: await embed(aligned(rgb, width, height, face.kps)),
+    });
   }
   return described;
 }

@@ -253,7 +253,9 @@ def dispatch(job, progress):
         source = store.get(clip['source_id'], 'source')
         path = config.DATA / 'sources' / source['id'] / 'transcript.json'
         words = json.loads(path.read_text()) if path.exists() else []
-        return editor.focus_track(config.DATA / source['path'], clip, config.DATA / 'jobs' / job['id'], progress, words)
+        plan = editor.focus_track(config.DATA / source['path'], clip, config.DATA / 'jobs' / job['id'], progress, words)
+        # The cached plan stays on disk; the job record keeps only a summary.
+        return {'ready': True, 'cast': plan.get('cast', []), 'cuts': len(plan.get('visual_cuts', []))}
     if kind == 'subject-gallery':
         from .subject_tracking import candidates
         clip=store.get(id,'clip');source=store.get(clip['source_id'],'source')

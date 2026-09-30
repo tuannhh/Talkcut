@@ -1,4 +1,13 @@
-export const sceneLabels={speaker:'Người đang nói',reaction:'Cảnh người nghe',broll:'Cảnh trám',wrong_shot:'Có thể quay nhầm',broken:'Hình lỗi / mất nét',transition:'Chuyển cảnh / lia máy',end:'Kết cảnh',uncertain:'Chưa đủ bằng chứng'};
+export const sceneLabels={speaker:'Người đang nói',reaction:'Cảnh người nghe',broll:'Cảnh trám',wrong_shot:'Có thể quay nhầm',broken:'Hình lỗi / mất nét',transition:'Chuyển cảnh / lia máy',end:'Kết cảnh',uncertain:'Chưa đủ bằng chứng',stacked:'Ghép khung khách mời / MC',empty:'Toàn cảnh trên nền mờ'};
+export const roleLabels={host:'MC',guest:'Khách mời',other:'Người trong cảnh'};
+// Tightened pauses from the AI director: [start,end) in clip seconds, removed
+// from both picture and sound in the export, skipped during preview playback.
+export function removedAt(removed,time){
+ return (removed||[]).find(([a,b])=>time>=a-.005&&time<b-.02)||null;
+}
+export function outputTime(removed,time){
+ return time-(removed||[]).reduce((sum,[a,b])=>sum+Math.max(0,Math.min(time,b)-a),0);
+}
 export function wordGroups(words,maxWords=28,maxSeconds=10){
  const groups=[];let group=[];
  for(const w of words){const last=group.at(-1);if(last&&(group.length>=maxWords||w.start-last.end>.7||last.speaker!==w.speaker||/[.!?…][”"']?$/.test(last.text)||w.end-group[0].start>maxSeconds)){groups.push(group);group=[];}group.push(w);}
@@ -15,13 +24,16 @@ export function focusGeometry(info,settings,p){
  cx=clamp(cx,right-cw/iw/2,left+cw/iw/2);cy=clamp((y1+y2)/2+ch/ih*.17,bottom-ch/ih/2,top+ch/ih/2);}
  return {...p,mode:'crop',x:(clamp(cx*iw-cw/2,0,iw-cw)+cw/2)/iw,y:(clamp(cy*ih-ch/2,0,ih-ch)+ch/2)/ih,cw,ch};
 }
-export function focusAt(points,time){
+// linear: AI-director keyframes, which the export always interpolates inside a
+// scene (backend/director.py::_piecewise); legacy plans treat big moves as jumps.
+export function focusAt(points,time,linear=false){
  if(!points?.length)return {mode:'crop',x:.5,y:.5};
  let i=0;while(i+1<points.length&&points[i+1].time<=time)i++;
  const p=points[i],q=points[i+1];if(!q)return p;
  const f=clamp((time-p.time)/Math.max(.01,q.time-p.time),0,1);
  const jump=q.cut||p.scene!==q.scene||p.mode!==q.mode;
- return {...p,x:jump||Math.abs(q.x-p.x)>.18?p.x:p.x+(q.x-p.x)*f,y:jump||Math.abs(q.y-p.y)>.18?p.y:p.y+(q.y-p.y)*f};
+ const far=axis=>!linear&&Math.abs(q[axis]-p[axis])>.18;
+ return {...p,x:jump||far('x')?p.x:p.x+(q.x-p.x)*f,y:jump||far('y')?p.y:p.y+(q.y-p.y)*f};
 }
 
 // Preserve measured timing anchors. Added words share an existing spoken interval;
@@ -47,17 +59,11 @@ export function replaceTimedGroup(words,group,text){
  return [...words.slice(0,first),...editTimedGroup(group,text),...words.slice(first+group.length)];
 }
 
-// Mirrors backend/stacked_view.py::half_geometry so the live preview matches export.
-export function stackedGeometry(info,settings,face){
- const iw=info.width,ih=info.height,z=Math.min(2,(settings.crop_zoom||1)*1.45);
- const cw=Math.max(2,Math.floor(Math.min(iw,ih*9/16)/z/2)*2),ch=Math.max(2,Math.floor(cw*8/9/2)*2);
- const [x1,y1,x2,y2]=face,fw=x2-x1,fh=y2-y1;
- const left=Math.max(0,x1-fw*.15),right=Math.min(1,x2+fw*.15),top=Math.max(0,y1-fh*.45),bottom=Math.min(1,y2+fh*.9);
- let cx,cy;
- if((right-left)*iw>cw||(bottom-top)*ih>ch){cx=clamp((x1+x2)/2,cw/iw/2,1-cw/iw/2);cy=clamp((y1+y2)/2,ch/ih/2,1-ch/ih/2);}
- else{cx=clamp((x1+x2)/2,right-cw/iw/2,left+cw/iw/2);cy=clamp((y1+y2)/2+ch/ih*.12,bottom-ch/ih/2,top+ch/ih/2);}
- const x=clamp(cx*iw-cw/2,0,iw-cw),y=clamp(cy*ih-ch/2,0,ih-ch);
- return {x:(x+cw/2)/iw,y:(y+ch/2)/ih,cw,ch};
+// Source rectangle of one prepared crop, in the preview video's own pixels.
+// Same clamping as backend/director.py, so preview and export frame alike.
+export function sourceRect(info,video,p){
+ const cw=p.cw/info.width*video.width,ch=p.ch/info.height*video.height;
+ return {x:clamp(p.x*video.width-cw/2,0,video.width-cw),y:clamp(p.y*video.height-ch/2,0,video.height-ch),w:cw,h:ch};
 }
 export function stackedWindowAt(segments,time){
  return (segments||[]).find(s=>time>=s.start&&time<s.end)||null;

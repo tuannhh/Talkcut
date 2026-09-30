@@ -32,9 +32,11 @@ def test_preset_cannot_overwrite_another_record_kind():
     assert client.post('/api/presets',json={'name':'   ','settings':{}}).status_code==400
 
 
-def test_saved_v4_migrates_once_and_new_mix_can_be_disabled():
-    assert Settings.model_validate({'crop_mode':'auto','transition_seconds':.24}).mix_seconds==.65
-    assert Settings.model_validate({'crop_mode':'auto','mix_seconds':0,'pacing_version':5}).mix_seconds==0
+def test_saved_clips_move_to_straight_cuts_once_and_a_chosen_mix_is_kept():
+    # v6 (AI director): saved v4/v5 clips start with hard cuts, like a vision mixer.
+    assert Settings.model_validate({'crop_mode':'auto','transition_seconds':.24}).mix_seconds==0
+    assert Settings.model_validate({'crop_mode':'auto','mix_seconds':.65,'pacing_version':5}).mix_seconds==0
+    assert Settings.model_validate({'mix_seconds':.65,'pacing_version':6}).mix_seconds==.65
     assert Settings(mix_seconds=1.2).mix_seconds==1.2
 
 
@@ -65,4 +67,4 @@ def test_new_mix_settings_remain_readable_by_legacy_v4_range():
     current=Settings(mix_seconds=1.2).model_dump()
     assert current['transition_seconds']<=.5 and current['mix_seconds']==1.2
     upgraded=Settings.model_validate({'pacing_version':5,'transition_seconds':.9})
-    assert upgraded.mix_seconds==.9 and upgraded.transition_seconds==.24
+    assert upgraded.mix_seconds==0 and upgraded.transition_seconds==.24

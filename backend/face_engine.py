@@ -34,9 +34,12 @@ def status() -> dict | None:
 
 
 def describe(image: object) -> list[dict]:
-    """Describe detected local faces, rejecting malformed engine output."""
+    """Describe detected local faces, rejecting malformed engine output.
+
+    Accepts a decoded OpenCV image or JPEG bytes already on disk."""
+    content = bytes(image) if isinstance(image, (bytes, bytearray)) else _encode(image)
     try:
-        response = httpx.post(URL + '/v1/describe', content=_encode(image), headers={'content-type': 'image/jpeg'}, timeout=TIMEOUT)
+        response = httpx.post(URL + '/v1/describe', content=content, headers={'content-type': 'image/jpeg'}, timeout=TIMEOUT)
         response.raise_for_status()
         payload = response.json()
     except (httpx.HTTPError, ValueError) as error:
@@ -48,10 +51,13 @@ def describe(image: object) -> list[dict]:
             embedding = [float(value) for value in item['embedding']]
             valid = (len(box) == 4 and len(embedding) == 512 and all(math.isfinite(value) for value in box + embedding)
                      and 0 <= box[0] < box[2] <= 1 and 0 <= box[1] < box[3] <= 1)
+            kps = [[float(x), float(y)] for x, y in item.get('kps') or []]
+            if len(kps) != 5 or not all(math.isfinite(v) for point in kps for v in point):
+                kps = None
         except (KeyError, TypeError, ValueError):
             valid = False
         if valid:
-            result.append({'box': box, 'embedding': embedding, 'score': float(item.get('score', 0))})
+            result.append({'box': box, 'embedding': embedding, 'score': float(item.get('score', 0)), 'kps': kps})
     return result
 
 

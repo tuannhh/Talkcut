@@ -18,3 +18,11 @@
 .main-hook{position:absolute;left:9.26%;right:9.26%;top:50%;transform:translateY(-50%);font-family:Barlow,sans-serif;font-weight:700;font-size:7.037cqw;line-height:1.15;text-align:center;text-shadow:1px 1px 2px #101010;pointer-events:none;z-index:3}
 @media(min-width:1250px){.studio-layout{grid-template-columns:minmax(250px,.85fr) minmax(330px,1.3fr) minmax(340px,1fr)}}
 @media(max-width:900px){.edit-navigation{flex-wrap:wrap}.quick-step .subject-gallery img{height:110px}}
+.director-panel{display:grid;gap:12px}.director-panel .helper{margin:0}.director-panel [role=alert]{color:#d93025;font-size:12px;line-height:1.6}
+.director-note{font-size:12px;line-height:1.6;color:var(--muted)}
+.cast-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.cast-card{margin:0;display:grid;gap:6px;border:1px solid var(--line);border-radius:8px;padding:6px;background:var(--panel)}
+.cast-card img,.cast-card .cast-empty{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:var(--line)}
+.cast-card figcaption{display:grid;gap:2px}.cast-card strong{font-size:12px}.cast-card small{font-size:11px;color:var(--muted)}
+.cast-card.host{border-color:#ff7300}.cast-card.host strong{color:#ff7300}
+.director-panel button,.focus-status .director-panel button{background:#0086ff;color:#fff;border-color:#0086ff}

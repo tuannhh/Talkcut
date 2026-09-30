@@ -44,10 +44,15 @@ class Settings(BaseModel):
             value={**value, 'summary_enabled':False}
             # Preserve the legacy field's range so a v4 image can still open
             # the same database after rollback. New Mix uses its own field.
-            if 'mix_seconds' not in value:
-                value['mix_seconds']=value.get('transition_seconds',.65) if value.get('pacing_version')==5 else .65
+            # A saved record either carries pacing_version or predates Mix; an
+            # explicit new value (Settings(mix_seconds=.9)) is not a saved record.
+            saved=value.get('pacing_version',0)<6 and ('pacing_version' in value or 'mix_seconds' not in value)
             if value.get('transition_seconds',.24)>.5:value['transition_seconds']=.24
-            value['pacing_version']=5
+            # v6: the AI director cuts straight between angles, like a live
+            # vision mixer. Mix stays available but starts off for every clip.
+            # Stacked two-person framing no longer needs two hand-picked faces.
+            if saved:value.update(mix_seconds=0,stacked_enabled=True)
+            value['pacing_version']=6
         return value
 
     summary_enabled: bool = False
@@ -60,9 +65,9 @@ class Settings(BaseModel):
     intro_background_scale: float = Field(default=1, ge=.5, le=1.5)
     calm_short_shots: bool = True
     calm_max_seconds: float = Field(default=4, ge=1, le=6)
-    pacing_version: int = 5
+    pacing_version: int = 6
     transition_seconds: float = Field(default=.24, ge=0, le=.5)
-    mix_seconds: float = Field(default=.65, ge=0, le=1.2)
+    mix_seconds: float = Field(default=0, ge=0, le=1.2)
     intro_title_text: str = Field(default='', max_length=180)
     intro_title_highlight: str = Field(default='', max_length=100)
     intro_title_highlight_color: str = Field(default='#ff7300', pattern=r'^#[0-9a-fA-F]{6}$')
@@ -124,7 +129,12 @@ class Settings(BaseModel):
     crop_locks: list[CropLock] = Field(default_factory=list, max_length=300)
     tracking_subject: str | None = Field(default=None, pattern=r'^[a-f0-9]{24}$')
     tracking_subject_2: str | None = Field(default=None, pattern=r'^[a-f0-9]{24}$')
-    stacked_enabled: bool = False
+    stacked_enabled: bool = True
+    # AI director: tighten pauses/hesitations, punch in on wide shots and jump
+    # cuts, and swap the detected host/guest roles if the transcript misled it.
+    silence_trim: bool = True
+    punch_in: bool = True
+    swap_roles: bool = False
     intro_title_font: Literal['DejaVu Sans','Google Sans','Open Sans','Barlow','Roboto'] = 'DejaVu Sans'
     crop_x: float = Field(default=0.5, ge=0, le=1)
     crop_zoom: float = Field(default=1.0, ge=1, le=2)

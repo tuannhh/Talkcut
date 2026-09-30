@@ -70,35 +70,19 @@ def test_bundled_fonts_load_vietnamese(family,bold,italic):
     assert f.getmask('ắ ề ộ ự Đ').getbbox()
 
 
-def test_selected_draft_uses_auto_geometry_even_when_saved_manual(monkeypatch):
+def test_focus_preview_uses_auto_geometry_and_draft_toggles_without_touching_the_saved_clip(monkeypatch):
     import backend.app as api
-    c={'source_id':'source','start':0,'end':2,'settings':Settings(crop_mode='manual').model_dump()}
+    c={'source_id':'source','start':0,'end':2,'settings':Settings(crop_mode='manual',stacked_enabled=True).model_dump()}
     monkeypatch.setattr(api.store,'get',lambda id,*args: c if id=='clip' else {'path':'source.mp4','width':1920,'height':1080})
-    monkeypatch.setattr('backend.subject_tracking.reference',lambda *args: {})
+    monkeypatch.setattr(api.focusing,'cached',lambda source,clip: None)
+    assert api.get_focus('clip',zoom=1)['plan'] is None  # analysis is queued work, never run on open
     seen=[]
-    monkeypatch.setattr(api.focusing,'cached',lambda source,clip: seen.append(clip['settings']) or None)
-    monkeypatch.setattr(api.focusing,'visual_preview',lambda *args: pytest.fail('Opening a clip must not scan the whole video'))
-    assert api.get_focus('clip',zoom=1,subject='a'*24)['plan'] is None
-    assert seen[0]['crop_mode']=='auto'
-    assert c['settings']['crop_mode']=='manual'
-
-
-def test_focus_endpoint_keeps_ordinary_reaction_hold_support(tmp_path,monkeypatch):
-    """Removing reference stills must not break unrelated focus responses."""
-    import backend.app as api
-    source_file=tmp_path/'source.mp4';source_file.write_bytes(b'x')
-    clip={'id':'clip','source_id':'source','start':0,'end':2,'settings':Settings(crop_mode='auto').model_dump()}
-    source={'path':str(source_file), 'width':1920, 'height':1080}
-    track={'start':0,'end':2,'keyframes':[{'time':0,'x':.5,'mode':'crop','scene':'camera:0'}], 'visual_cuts':[], 'scenes':[]}
-    monkeypatch.setattr(api.store,'get',lambda id,*args: clip if id=='clip' else source)
-    monkeypatch.setattr(api.focusing,'cached',lambda *args: track)
-    monkeypatch.setattr(api.focusing,'prepared_track',lambda *args: {**track,'holds':[{'start':.5,'end':.8,'frame_time':.4}]})
-    monkeypatch.setattr(api.focusing,'calm_holds',lambda *args: [{'start':.5,'end':.8,'frame_time':.4}])
-    hold_dir=api.config.DATA/'ordinary-hold';hold_dir.mkdir(exist_ok=True)
-    monkeypatch.setattr(api.focusing,'cache_dir',lambda *args: hold_dir)
-    monkeypatch.setattr('backend.intro_art.freeze',lambda source,clip,seconds,target: target.write_bytes(b'jpg'))
-    result=api.get_focus('clip', None)
-    assert result['plan']['holds'][0]['path'].endswith('.jpg')
+    monkeypatch.setattr(api.focusing,'cached',lambda source,clip: {'start':0,'end':2})
+    monkeypatch.setattr(api.focusing,'prepared_track',lambda track,source,settings: seen.append(settings) or {'director':True})
+    assert api.get_focus('clip',zoom=1.2,stacked=False,trim=False,punch=True,swap=True)['plan']=={'director':True}
+    assert seen[0]['crop_mode']=='auto' and seen[0]['crop_zoom']==1.2
+    assert (seen[0]['stacked_enabled'],seen[0]['silence_trim'],seen[0]['punch_in'],seen[0]['swap_roles'])==(False,False,True,True)
+    assert c['settings']['crop_mode']=='manual' and c['settings']['stacked_enabled'] is True
 
 
 def test_reference_tracking_never_inserts_a_static_visual_hold():
