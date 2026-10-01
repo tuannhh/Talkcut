@@ -272,3 +272,74 @@ def test_export_chain_keeps_picture_and_sound_in_sync_through_jump_cuts(tmp_path
     assert len(beeps) == 2
     for s, (a, _) in zip(starts, beeps):
         assert abs(s / FPS - a / 48000) <= 1 / FPS
+
+
+def test_stacked_halves_are_square_and_keep_each_head_out_of_the_blend_zone():
+    plan = prepare(_analysis(), INFO, SETTINGS)
+    analysis = _analysis()
+    faces = {f['person']: f for s in analysis['samples'] if s['shot'] == 1 for f in s['faces']}
+    zone = director.BLEND / director.HALF_SIZE
+    for role, person in (('top', 'p0'), ('bottom', 'p1')):
+        half = plan['stacked'][0][role]
+        assert half['cw'] == half['ch']
+        hn = half['ch'] / INFO['height']
+        top = half['y'] - hn / 2
+        box = safe_box(faces[person])
+        if role == 'top':
+            assert (box[3] - top) / hn <= 1 - zone + 1e-6  # chin clear of the part fading out
+        else:
+            assert (box[1] - top) / hn >= zone - 1e-6  # hair clear of the part fading in
+    assert plan['blend'] == {'height': director.BLEND, 'half': director.HALF_SIZE, 'stops': director.BLEND_STOPS,
+                             'caption_y': director.STACKED_CAPTION_Y}
+
+
+def test_blend_mask_follows_the_shared_stops():
+    from PIL import Image
+    assert director.BLEND_STOPS[0] == (0, 1) and director.BLEND_STOPS[-1] == (1, 0)
+    with Image.open(director.blend_mask_asset()) as mask:
+        assert mask.size == (1080, director.HALF_SIZE)
+        start = director.HALF_SIZE - director.BLEND
+        assert mask.getpixel((500, start - 1)) == 255
+        for y in (start, start + director.BLEND // 2, director.HALF_SIZE - 1):
+            assert abs(mask.getpixel((500, y)) - 255 * director.blend_alpha((y - start + .5) / director.BLEND)) <= 1
+
+
+@pytest.mark.skipif(not shutil.which('ffmpeg'), reason='requires a real ffmpeg binary')
+def test_stacked_frame_dissolves_the_top_person_into_the_bottom_one():
+    info = {'width': 1920, 'height': 1080}
+    halves = {'top': {'x': .25, 'y': .5, 'cw': 540, 'ch': 540}, 'bottom': {'x': .75, 'y': .5, 'cw': 540, 'ch': 540}}
+    graph = director.stacked_graph(info, [{'start': 0, 'end': 1, **halves}], 1)
+    r = subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i',
+                        'color=red:s=1920x1080:r=30:d=0.2,drawbox=x=960:y=0:w=960:h=1080:color=blue:t=fill',
+                        '-vf', f'{graph},format=rgb24', '-frames:v', '1', '-f', 'rawvideo', '-'], capture_output=True, check=True, timeout=60)
+    assert len(r.stdout) == 1080 * 1920 * 3
+
+    def red(y):
+        offset = (y * 1080 + 540) * 3
+        return r.stdout[offset] / 255
+
+    start = 1920 - director.HALF_SIZE
+    assert red(400) > .95 and red(start - 5) > .95  # the top person's own picture
+    assert red(1500) < .05 and red(start + director.BLEND + 5) < .05  # the bottom person's
+    assert abs(red(start + director.BLEND // 2) - .5) < .08  # one dissolve, not a hard edge
+    reds = [red(y) for y in range(start, start + director.BLEND, 10)]
+    assert all(a >= b - .02 for a, b in zip(reds, reds[1:]))
+
+
+def test_captions_move_between_the_stacked_people_exactly_at_the_cut(tmp_path):
+    import re
+    from backend.editor import make_ass
+    from backend.schemas import Settings
+    settings = {**Settings().model_dump(), 'caption_y': .73, 'caption_words': 6, 'main_title_enabled': False}
+    words = [{'text': t, 'start': 10 + i * .5, 'end': 10.4 + i * .5, 'speaker': 'a'} for i, t in enumerate(['một', 'hai', 'ba', 'bốn'])]
+    clip = {'start': 10, 'end': 14, 'title': ''}
+    target = tmp_path / 'c.ass'
+    make_ass(words, clip, settings, target, [{'start': 1.2, 'end': 3}])
+    events = [(line.split(',')[1], int(re.search(r'\\pos\(\d+,(\d+)\)', line).group(1)))
+              for line in target.read_text(encoding='utf-8').splitlines() if line.startswith('Dialogue: 0')]
+    ys = {start: y for start, y in events}
+    assert ys['0:00:00.00'] == round(.73 * 1920)
+    assert ys['0:00:01.20'] == round(director.STACKED_CAPTION_Y * 1920) == 960  # split at the cut itself
+    assert ys['0:00:01.00'] == round(.73 * 1920)
+    make_ass(words, clip, settings, target)  # no director plan: the user's position everywhere
+    assert {int(y) for y in re.findall(r'\\pos\(\d+,(\d+)\)', target.read_text(encoding='utf-8'))} == {round(.73 * 1920)}

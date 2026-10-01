@@ -266,3 +266,42 @@ Ngày kiểm tra: 07/09/2026. Môi trường: macOS Apple Silicon, Python 3.12, 
   backdrop blended softly across the seam instead of a flat dark band; a
   frame at 64s (outside any segment) confirms the ordinary single-subject
   crop is unaffected.
+
+## v0.12.0-rc.1 — local AI director — 2026-10-01
+
+Environment: Windows 10, Docker Desktop 29.8.0, images rebuilt from the merged
+tree (origin/main 8912bd8 + director). CPU path on this machine: libx264
+`-preset fast -crf 18`, no hardware decode.
+
+- 192 Python tests pass inside the rebuilt `studio` container (23 director
+  tests, including real-FFmpeg A/V sync on the 30 fps grid, the stacked
+  red/blue dissolve, mask stops, head-safe composition and caption placement
+  split exactly at a stacked cut). 11 JS tests pass (`node --test src/`);
+  the Vite production build passes.
+- Director plans on real clips (`prepare` on cached analyses):
+  - `d714fb42` 4K AV1, 148.2 s: 10 shots, 4 stacked, 9.7 s of pauses
+    removed → 138.533 s.
+  - `6c0477d0` 1080p, 211.3 s: 32 shots, 12 stacked, 11.4 s removed →
+    199.867 s.
+  - `01103506` 1080p, 236.3 s: 35 shots, 15 stacked, 15.8 s removed →
+    220.501 s.
+- Full render of `d714fb42` (no intro/outro/music) in 81.4 s: 1080 × 1920
+  H.264, 4157 frames at 30/1, video 138.567 s, audio 138.554 s; a full decode
+  with `ffmpeg -f null` reports no errors.
+- Frames extracted from that MP4 while a word is spoken: in the 4 stacked
+  windows the guest is on top, the host below, the dissolve shows the studio
+  backdrop (no flat band), and the caption sits in the blend zone between
+  them (y 960/1920) instead of over the host's face; single shots keep the
+  user's 73 % caption position and a whole, upright speaker.
+- Browser (running editor at 127.0.0.1:8092, same clip): the director panel
+  shows the plan note, cast cards (guest 83 s, host 24 s) and switches; at
+  output 0:35 (source 38.37 s, stacked) the preview caption `Cho nên là lời
+  khuyên` is centred at 0.500 of the frame, and at 40.37 s (single) it is at
+  73 %, matching the export's words and positions.
+- Earlier in the session: a real back-of-head cut at 88.2–88.5 s of
+  `d714fb42` was fixed by the `safe_box` margin, and the stacked preview canvas
+  was checked to show texture through the blend zone.
+
+Limits: no precision/recall measurement of speaker-to-person mapping on a
+large set; overlapping speech was not specifically evaluated. Not a
+stable release until the user accepts it.

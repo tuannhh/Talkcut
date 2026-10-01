@@ -57,9 +57,10 @@ def test_mix_near_end_does_not_shorten_clip_and_windows_do_not_overlap():
 
 
 def test_short_angle_hold_does_not_hide_a_voice_change():
-    track={'start':0,'end':10,'source_fps':25,'visual_cuts':[3,5,8], 'scenes':[], 'speech_turns':[{'start':0,'end':8,'speaker':'A'}]}
+    # The insert stays under focus.MAX_HOLD_SECONDS (1.6 s): longer ones play live.
+    track={'start':0,'end':10,'source_fps':25,'visual_cuts':[3,4.5,8], 'scenes':[], 'speech_turns':[{'start':0,'end':8,'speaker':'A'}]}
     assert focus.calm_holds(track,Settings().model_dump())[0]['start']==3
-    track['speech_turns']=[{'start':0,'end':3,'speaker':'A'},{'start':3,'end':5,'speaker':'B'},{'start':5,'end':10,'speaker':'A'}]
+    track['speech_turns']=[{'start':0,'end':3,'speaker':'A'},{'start':3,'end':4.5,'speaker':'B'},{'start':4.5,'end':10,'speaker':'A'}]
     assert focus.calm_holds(track,Settings().model_dump())==[]
 
 

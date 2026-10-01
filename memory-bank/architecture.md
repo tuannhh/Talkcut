@@ -89,3 +89,33 @@ short local cues. ASS renders optional opening text from the current clip title,
 while existing word timestamps drive captions; bundled fonts are registered in
 fontconfig. QuickEditor keeps existing detailed editors available, and shows
 unimplemented profile observations separately from applied settings.
+
+## v14 AI director (`backend/director.py`)
+
+`analyze(source, clip)` is the only expensive pass; it is cached per source
+file identity + clip bounds in `DATA/jobs/director-<sha>/director.json` and runs
+as the queued `focus` job. It stores samples (boxes, kps, person ids — no
+embeddings), clip words `[start, end, voice]`, speakers, cast (with 160 px
+thumbnails), classified audio gaps and exact cuts. `prepare(analysis, info,
+settings)` is cheap and deterministic; `GET /api/clips/{id}/focus` runs it with
+draft toggles from the query (zoom, stacked, trim, punch, swap) so the preview
+equals the export for unsaved settings. `editor.render` calls
+`director.video_filter`/`audio_filter` with the same prepared plan.
+
+Render chain: `fps=30:round=up:start_time=0` → single-crop branch (`crop` strip
+on `t`, then `zoompan` on `it` for per-segment sizes) with optional blur fill,
+overlaid in stacked windows by the stacked branch (two square crops, bottom
+padded, top alpha-merged with `director-blend-240-v1.png`) → optional Mix →
+ASS → `select` of kept intervals + `setpts=N/30/TB`. Audio: kept pieces via
+`asplit/atrim/afade/concat`. Input `-t` bounds decoding; the output `-r 30`
+from `encode_args` must stay (without it the CLI keeps the source rate and
+drops frames). The finite looped mask plus `shortest=1` keeps FFmpeg from
+running past the clip after frames are dropped.
+
+Captions: `make_ass(..., stacked)` splits caption events at
+`director.caption_boundaries` (stacked edges + title end) and positions each
+event with `director.caption_y` (clip time, before `select`). The plan carries
+`blend.caption_y`; the preview's `captionY()` reads it, so both agree.
+
+`focus.prepared_track`/`static_framing.cached_track` recognise director plans;
+manual framing and centre modes are unchanged.

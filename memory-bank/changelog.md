@@ -187,3 +187,32 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
   proving the seam colour tracks the surrounding footage). Re-rendered a real
   user clip live and visually confirmed against real stacked segments — see
   VALIDATION.md. Not yet re-checkpointed as a new stable version.
+
+## 2026-09-30 — v0.12.0-rc.1 candidate: local AI director
+
+- Auto framing is now a fully automatic director (`backend/director.py`):
+  exact-frame cuts, per-shot face tracks clustered into people, voices mapped
+  to on-screen people per STT chunk, host/guest roles from the transcript, and
+  per-shot layouts (single, stacked guest-top/host-bottom, virtual camera,
+  blur fill).
+- Head-safe composition: back-of-head margin for turned heads (fixed a real
+  cut at 88.2–88.5 s of clip d714fb42), neighbour-union windows between
+  2 fps samples, look room, no half faces at the edges.
+- Stacked two-shot is one picture: square halves overlapping 240 px with a
+  smoothstep dissolve (replaces the flat blurred band seen in real renders).
+- Silence/filler tightening on quiet joins only; missed speech is never cut;
+  jump cuts alternate a 1.12× punch-in; A/V equal length on the 30 fps grid.
+- UI: `AI đạo diễn khung hình` panel with cast cards, role swap and three
+  switches; Mix slider labels 0 as `Cắt thẳng`; the preview skips removed
+  pauses and shows output time.
+- Settings v6 migration: only saved ≤v5 records move to hard cuts; explicit
+  `Settings(mix_seconds=…)` values are kept (fixed a preset regression the
+  first migration draft introduced).
+- Rebased onto origin/main 8912bd8 (GPU/CPU image, render progress, caption
+  scale, installer); `ffmpeg_progress` + `hwaccel_input_args` kept in render.
+- Upstream test for short holds updated to the 1.6 s hold cap.
+- Captions move into the blend zone between the two people of a stacked
+  frame (they covered the host's face at the default 73 %), split exactly at
+  the stacked cut, unchanged under the opening title; preview matches.
+- 192 Python tests (23 new director tests incl. real FFmpeg A/V sync, blend
+  and caption placement) and 11 JS tests pass in the rebuilt image.

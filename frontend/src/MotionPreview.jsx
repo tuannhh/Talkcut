@@ -1,9 +1,9 @@
 import React,{useRef,useEffect} from 'react';
 import {focusAt,focusGeometry,staticCenter,stackedWindowAt,removedAt,sourceRect} from './studio-helpers.mjs';
 
-// Mirrors backend/stacked_view.py: a 220px seam band (of 1920) blurred from the
-// stacked image itself and faded in with a (1-d)^1.4 alpha profile.
-const SEAM=Math.round(220*1280/1920),SEAM_MARGIN=60;
+// Mirrors backend/director.py stacked_graph: two square halves overlapping around
+// the middle, the top one fading out over the blend zone with the plan's stops.
+const BLEND={height:240,half:1080,stops:[[0,1],[1,0]]};
 
 export function MotionPreview({video,clip,plan,points,info,media,stacked,removed}){
  const canvas=useRef();const s=clip.settings;
@@ -18,7 +18,8 @@ export function MotionPreview({video,clip,plan,points,info,media,stacked,removed
   const v=video.current,out=canvas.current;if(!v||!out)return;
   const ctx=out.getContext('2d'),W=720,H=1280;out.width=W;out.height=H;
   const buffers=Array.from({length:3},()=>{const c=document.createElement('canvas');c.width=W;c.height=H;return c;});
-  const seam=document.createElement('canvas');seam.width=W;seam.height=SEAM+2*SEAM_MARGIN;
+  const blend=plan?.blend||BLEND,halfH=Math.round(blend.half*H/1920),blendH=blend.height*H/1920;
+  const topHalf=document.createElement('canvas');topHalf.width=W;topHalf.height=halfH;
   let previous=null,outgoing=null,activeCut=null;
   const director=!!plan?.director;
   const holds=!director&&(s.calm_short_shots||plan?.reference_tracking)&&plan?.framing_mode===s.crop_mode?plan?.holds||[]:[],images=new Map();
@@ -33,16 +34,14 @@ export function MotionPreview({video,clip,plan,points,info,media,stacked,removed
    c.drawImage(v,(W-v.videoWidth*contain)/2,(H-v.videoHeight*contain)/2,v.videoWidth*contain,v.videoHeight*contain);
   }
   function drawStacked(window){
-   const half=H/2;size.width=v.videoWidth;size.height=v.videoHeight;
-   for(const [part,y0] of [[window.top,0],[window.bottom,half]]){const r=sourceRect(info,size,part);ctx.drawImage(v,r.x,r.y,r.w,r.h,0,y0,W,half);}
-   const sc=seam.getContext('2d'),top=half-SEAM/2;
-   sc.clearRect(0,0,W,seam.height);sc.globalCompositeOperation='source-over';sc.filter='blur(52px)';
-   sc.drawImage(out,0,top-SEAM_MARGIN,W,seam.height,0,0,W,seam.height);sc.filter='none';
-   const fade=sc.createLinearGradient(0,SEAM_MARGIN,0,SEAM_MARGIN+SEAM);
-   for(let i=0;i<=10;i++){const d=Math.abs(i/10-.5)*2;fade.addColorStop(i/10,`rgba(0,0,0,${(.92*Math.pow(1-d,1.4)).toFixed(3)})`);}
-   sc.globalCompositeOperation='destination-in';sc.fillStyle=fade;sc.fillRect(0,0,W,seam.height);
-   sc.globalCompositeOperation='source-over';
-   ctx.drawImage(seam,0,SEAM_MARGIN,W,SEAM,0,top,W,SEAM);
+   size.width=v.videoWidth;size.height=v.videoHeight;
+   const b=sourceRect(info,size,window.bottom),t=sourceRect(info,size,window.top),tc=topHalf.getContext('2d');
+   ctx.fillStyle='#000';ctx.fillRect(0,0,W,H-halfH);ctx.drawImage(v,b.x,b.y,b.w,b.h,0,H-halfH,W,halfH);
+   tc.globalCompositeOperation='source-over';tc.clearRect(0,0,W,halfH);tc.drawImage(v,t.x,t.y,t.w,t.h,0,0,W,halfH);
+   // Whole-canvas fill: above the blend zone the gradient pads with the first stop (opaque).
+   const fade=tc.createLinearGradient(0,halfH-blendH,0,halfH);for(const [at,alpha] of blend.stops)fade.addColorStop(at,`rgba(0,0,0,${alpha})`);
+   tc.globalCompositeOperation='destination-in';tc.fillStyle=fade;tc.fillRect(0,0,W,halfH);tc.globalCompositeOperation='source-over';
+   ctx.drawImage(topHalf,0,0);
   }
   function draw(){
    if(disposed||v.readyState<2)return;

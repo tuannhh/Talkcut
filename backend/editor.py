@@ -209,7 +209,10 @@ def libass_size_scale(font_name):
         return 1.0
 
 
-def make_ass(words, clip, settings, target):
+def make_ass(words, clip, settings, target, stacked=None):
+    """Caption events on measured word timings. `stacked` (AI director windows,
+    clip seconds) moves captions between the two people of a stacked frame."""
+    from .director import caption_boundaries, caption_y
     selected = [{**w, 'start': max(0, w['start'] - clip['start']), 'end': min(clip['end'], w['end']) - clip['start']} for w in words if w['end'] > clip['start'] and w['start'] < clip['end']]
     color = settings['caption_color'].lstrip('#')
     color = color[4:6] + color[2:4] + color[:2]
@@ -228,7 +231,9 @@ def make_ass(words, clip, settings, target):
         lines.append(f'Dialogue: 1,0:00:00.00,{ass_time(min(settings.get("main_title_seconds",3),clip["end"]-clip["start"]))},Hook,,0,0,0,,{{\\an5\\pos(540,960)\\c&H{c}&}}{text}')
     for group in subtitle_groups(selected, settings['caption_words']) if settings.get('caption_enabled',True) else []:
         # One event per spoken word, plus neutral gaps. No proportional timing guesses.
-        boundaries = sorted({w['start'] for w in group} | {w['end'] for w in group})
+        boundaries = {w['start'] for w in group} | {w['end'] for w in group}
+        # A layout change inside a phrase repositions the caption exactly at that cut.
+        boundaries = sorted(boundaries | {t for t in caption_boundaries(settings, stacked) if min(boundaries) < t < max(boundaries)})
         for start, end in zip(boundaries, boundaries[1:]):
             if end <= start:
                 continue
@@ -236,7 +241,8 @@ def make_ass(words, clip, settings, target):
             for word in group:
                 active = settings.get('caption_karaoke',True) and word['start'] <= (start + end) / 2 < word['end']
                 texts.append('{\\c&H' + (color if active else 'FFFFFF') + '&}' + ass_escape(word['text']))
-            body = '{\\an5\\pos(' + str(round(settings.get('caption_x',510/1080)*W)) + ',' + str(round(settings['caption_y'] * H)) + ')}' + ' '.join(texts)
+            y = caption_y(settings, stacked, (start + end) / 2) if stacked else settings['caption_y']
+            body = '{\\an5\\pos(' + str(round(settings.get('caption_x',510/1080)*W)) + ',' + str(round(y * H)) + ')}' + ' '.join(texts)
             lines.append(f'Dialogue: 0,{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{body}')
     target.write_text('\n'.join(lines), encoding='utf-8')
 
@@ -376,18 +382,20 @@ def render(source, clip, words, settings, directory, progress):
     if settings['crop_mode']=='manual':
         from .static_framing import cached_track
         track=cached_track(source,clip)
+    directed = bool(track and track.get('director'))
+    if directed:
+        from . import director
+        # Same prepared plan the preview reads: framing, stacked two-shots, jump cuts.
+        track = director.prepare(track, info, settings)
     captions = None
     if settings['caption_enabled'] or settings.get('main_title_enabled'):
         if settings['caption_enabled'] and not words:
             raise ValueError('Chưa có transcript. Phân tích nguồn trước hoặc tắt phụ đề.')
         # Generated UUID-only paths under DATA; no user text enters filter syntax.
         captions = directory / 'captions.ass'
-        make_ass(words, clip, settings, captions)
+        make_ass(words, clip, settings, captions, track['stacked'] if directed else None)
     main_seconds, af = clip['end'] - clip['start'], 'aresample=48000,apad'
-    if track and track.get('director'):
-        from . import director
-        # Same prepared plan the preview reads: framing, stacked two-shots, jump cuts.
-        track = director.prepare(track, info, settings)
+    if directed:
         vf = director.video_filter(info, settings, track, captions)
         if track['removed']:
             af, main_seconds = director.audio_filter(track['removed'], main_seconds), track['kept_duration']

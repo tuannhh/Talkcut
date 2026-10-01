@@ -68,6 +68,12 @@ export function sourceRect(info,video,p){
 export function stackedWindowAt(segments,time){
  return (segments||[]).find(s=>time>=s.start&&time<s.end)||null;
 }
+// Mirrors director.caption_y: in a stacked frame captions sit between the two
+// people (the blend zone) unless the opening title holds the middle.
+export function captionY(settings,stacked,time,blend){
+ const hook=settings.main_title_enabled&&time<(settings.main_title_seconds??3);
+ return !hook&&blend&&stackedWindowAt(stacked,time)?blend.caption_y:settings.caption_y;
+}
 export function staticCenter(settings,time){
  const lock=[...(settings.crop_locks||[])].reverse().find(r=>r.start<=time&&time<r.end);
  return {x:lock?.x??settings.crop_x??.5,y:lock?.y??settings.crop_y??.5};

@@ -18,7 +18,7 @@ export function DirectorPanel({clip,plan,job,media,setting,onPrepare,busy}){
    </figure>)}</div>}
    {plan.cast?.length>=2&&<button className="secondary small" onClick={()=>setting('swap_roles',!s.swap_roles)}>Đổi vai MC ↔ khách mời</button>}
   </>}
-  <label className="quick-checkbox"><input type="checkbox" checked={s.stacked_enabled!==false} onChange={e=>setting('stacked_enabled',e.target.checked)}/>Ghép khung khi quay cảnh toàn: khách mời ở trên, MC ở dưới</label>
+  <label className="quick-checkbox"><input type="checkbox" checked={s.stacked_enabled!==false} onChange={e=>setting('stacked_enabled',e.target.checked)}/>Ghép khung khi quay cảnh toàn: khách mời ở trên, MC ở dưới, phụ đề nằm giữa</label>
   <label className="quick-checkbox"><input type="checkbox" checked={s.silence_trim!==false} onChange={e=>setting('silence_trim',e.target.checked)}/>Cắt khoảng lặng và tiếng ậm ừ{ready&&s.silence_trim!==false&&plan.removed_seconds?` · rút ${plan.removed_seconds.toFixed(1)} giây`:''}</label>
   <label className="quick-checkbox"><input type="checkbox" checked={s.punch_in!==false} onChange={e=>setting('punch_in',e.target.checked)}/>Đổi cỡ khung xen kẽ ở chỗ cắt khoảng lặng để nhát cắt không bị giật hình</label>
  </div>;

@@ -50,8 +50,20 @@ EPS = 5e-4
 HEAVY = ('samples', 'words', 'gaps')
 
 SINGLE = {'aspect': 9 / 16, 'face_ratio': .19, 'eye_line': .31, 'min_crop_h': 820, 'lead': .1}
+# Stacked two-shot: two square halves overlap by BLEND output pixels around the
+# middle and the top one dissolves into the bottom one, so the pair reads as one
+# picture instead of two tiles and a seam. Stops are (position in the blend
+# zone, alpha of the top half), a sampled smoothstep shared with the preview.
+BLEND = 240
+HALF_SIZE = 960 + BLEND // 2
+BLEND_STOPS = [(k / 8, round(1 - (3 * (k / 8) ** 2 - 2 * (k / 8) ** 3), 4)) for k in range(9)]
 # Split-screen halves read tidier with faces near the middle: little look room.
-HALF = {'aspect': 9 / 8, 'face_ratio': .30, 'eye_line': .42, 'min_crop_h': 420, 'lead': .04}
+# Each head stays out of the blend zone; eyes sit at ~42% of the visible part.
+HALF = {'aspect': 1.0, 'face_ratio': .27, 'eye_line': .38, 'min_crop_h': 460, 'lead': .04}
+HALF_TOP = {**HALF, 'inset_bottom': BLEND / HALF_SIZE}
+HALF_BOTTOM = {**HALF, 'eye_line': .48, 'inset_top': BLEND / HALF_SIZE}
+# Captions of a stacked frame sit in the blend zone, between the two people.
+STACKED_CAPTION_Y = (1920 - HALF_SIZE + BLEND / 2) / 1920
 JUMP_PUNCH = 1.12
 PAUSE_KEEP, TURN_KEEP = .16, .30
 
@@ -916,6 +928,8 @@ def compose(info, obs, others, style, size, start):
     iw, ih = info['width'], info['height']
     cw, ch = size
     wn, hn = min(1, cw / iw), min(1, ch / ih)
+    # A stacked half keeps the head out of the band where it blends with the other half.
+    inset_top, inset_bottom = style.get('inset_top', 0) * hn, style.get('inset_bottom', 0) * hn
     obs = sorted(obs, key=lambda row: row[0])
     boxes = [safe_box(face) for _, face in obs]
     plans = []
@@ -928,10 +942,10 @@ def compose(info, obs, others, style, size, start):
         near = boxes[max(0, i - 1):i + 2]
         left, top = min(b[0] for b in near), min(b[1] for b in near)
         right, bottom = max(b[2] for b in near), max(b[3] for b in near)
-        if right - left > wn or bottom - top > hn:
+        if right - left > wn or bottom - top > hn - inset_top - inset_bottom:
             left, top, right, bottom = boxes[i]
         xr = _window(right - wn / 2, left + wn / 2, wn / 2, 1 - wn / 2, (x1 + x2) / 2)
-        yr = _window(bottom - hn / 2, top + hn / 2, hn / 2, 1 - hn / 2, (y1 + y2) / 2)
+        yr = _window(bottom - hn / 2 + inset_bottom, top + hn / 2 - inset_top, hn / 2, 1 - hn / 2, (y1 + y2) / 2)
         plans.append((t, want_x, want_y, xr, yr))
     if not plans:
         return {'cw': cw, 'ch': ch, 'path': [(start, .5, .5)]}
@@ -1005,9 +1019,9 @@ def prepare(analysis, info, settings):
             points.append(point)
         if seg['layout'] == 'stacked':
             halves = {}
-            for role in ('top', 'bottom'):
+            for role, style in (('top', HALF_TOP), ('bottom', HALF_BOTTOM)):
                 person = seg[role]
-                half = compose(info, _obs(person, a, b), _others(faces, person, a, b), HALF, half_sizes[role], a)
+                half = compose(info, _obs(person, a, b), _others(faces, person, a, b), style, half_sizes[role], a)
                 _, x, y = half['path'][0]
                 halves[role] = {'x': round(x, 5), 'y': round(y, 5), 'cw': half['cw'], 'ch': half['ch'], 'person': person['person']}
             stacked.append({'start': round(a, 4), 'end': round(b, 4), **halves})
@@ -1016,11 +1030,14 @@ def prepare(analysis, info, settings):
     kept = kept_intervals(removed, duration)
     removed_seconds = round(sum(b - a for a, b in removed), 2)
     switches = sum(bool(s.get('virtual')) and not s.get('jump') for s in segments)
-    note = f"AI đạo diễn · {len(stacked)} cảnh ghép khung · {switches} lần máy quay ảo chuyển người nói"
+    note = 'AI đạo diễn · ' + ' · '.join(part for part in (
+        f"{len(analysis['visual_cuts']) + 1} cảnh quay", f'{len(stacked)} cảnh ghép khung' if stacked else '',
+        f'{switches} lần máy quay ảo chuyển người nói' if switches else '') if part)
     if removed_seconds:
         note += f' · rút {removed_seconds:.1f} giây khoảng lặng'
     return {**{k: v for k, v in analysis.items() if k not in HEAVY}, 'keyframes': points, 'visual_cuts': cuts, 'holds': [],
-            'prepared': True, 'prepared_zoom': zoom_min, 'scenes': scenes, 'stacked': stacked, 'removed': removed,
+            'prepared': True, 'prepared_zoom': zoom_min, 'scenes': scenes, 'stacked': stacked,
+            'blend': {'height': BLEND, 'half': HALF_SIZE, 'stops': BLEND_STOPS, 'caption_y': STACKED_CAPTION_Y}, 'removed': removed,
             'removed_seconds': removed_seconds, 'kept_duration': round(sum(b - a for a, b in kept), 4),
             'cast': cast, 'note': note + '.'}
 
@@ -1092,9 +1109,51 @@ def single_graph(info, settings, prepared):
             f"[dir_tight][dir_wide]overlay=0:0:shortest=1:enable='{enable}'")
 
 
+def caption_y(settings, stacked, t):
+    """Vertical caption position at clip time t. In a stacked frame the usual lower
+    position would cover the host's face, so captions move between the two people;
+    while the opening title holds the middle, they keep their own position."""
+    hook = settings.get('main_title_enabled') and t < settings.get('main_title_seconds', 3)
+    if not hook and any(s['start'] - EPS <= t < s['end'] - EPS for s in stacked or []):
+        return STACKED_CAPTION_Y
+    return settings['caption_y']
+
+
+def caption_boundaries(settings, stacked):
+    """Times where caption_y can change: caption events are split there."""
+    edges = {e for s in stacked or [] for e in (s['start'], s['end'])}
+    if stacked and settings.get('main_title_enabled'):
+        edges.add(settings.get('main_title_seconds', 3))
+    return edges
+
+
+def blend_alpha(t):
+    """Top-half alpha at position t (0..1) of the blend zone: linear between the
+    stops, exactly what the preview's canvas gradient draws."""
+    for (a, va), (b, vb) in zip(BLEND_STOPS, BLEND_STOPS[1:]):
+        if t <= b:
+            return va + (vb - va) * (t - a) / (b - a)
+    return BLEND_STOPS[-1][1]
+
+
+def blend_mask_asset():
+    path = config.DATA / 'generated' / f'director-blend-{BLEND}-v1.png'
+    if path.exists():
+        return path
+    from PIL import Image
+    path.parent.mkdir(parents=True, exist_ok=True)
+    start = HALF_SIZE - BLEND
+    rows = [255 if y < start else round(255 * blend_alpha((y - start + .5) / BLEND)) for y in range(HALF_SIZE)]
+    image = Image.new('L', (1080, HALF_SIZE))
+    image.putdata([value for value in rows for _ in range(1080)])
+    temp = path.with_name(uuid.uuid4().hex + '.png')
+    image.save(temp)
+    temp.replace(path)
+    return path
+
+
 def stacked_graph(info, stacked, duration):
     from .editor import balanced_sum
-    from .stacked_view import SEAM_BLUR, SEAM_HEIGHT, seam_mask_asset
     iw, ih = info['width'], info['height']
     # A finite mask: an endless looped image would keep every downstream
     # overlay alive after the source ends, and select drops those frames.
@@ -1108,15 +1167,15 @@ def stacked_graph(info, stacked, duration):
         def steps(values):
             return balanced_sum([f'{values[0]:.2f}'] + [f'({values[i] - values[i - 1]:.2f})*gte(t,{stacked[i]["start"] - EPS:.4f})'
                                                         for i in range(1, len(values)) if abs(values[i] - values[i - 1]) >= .5])
-        return f"crop={w}:{h}:x='{steps(xs)}':y='{steps(ys)}',scale=1080:960:flags=lanczos,setsar=1"
+        return f"crop={w}:{h}:x='{steps(xs)}':y='{steps(ys)}',scale=1080:{HALF_SIZE}:flags=lanczos,setsar=1"
 
-    mask = str(seam_mask_asset()).replace('\\', '\\\\').replace(':', '\\:').replace("'", "'\\''")
-    seam_y = 960 - SEAM_HEIGHT // 2
-    return (f"split=2[dv_ti][dv_bi];[dv_ti]{crop('top')}[dv_t];[dv_bi]{crop('bottom')}[dv_b];"
-            f"[dv_t][dv_b]vstack=inputs=2,split=2[dv_base][dv_seamsrc];"
-            f"[dv_seamsrc]crop=1080:{SEAM_HEIGHT}:0:{seam_y},boxblur={SEAM_BLUR}:{SEAM_BLUR}[dv_blur];"
+    mask = str(blend_mask_asset()).replace('\\', '\\\\').replace(':', '\\:').replace("'", "'\\''")
+    # Bottom half at the foot of the frame; the top half, faded out over its
+    # last BLEND rows, lies over it. The black pad is always fully covered.
+    return (f"split=2[dv_ti][dv_bi];[dv_ti]{crop('top')}[dv_t0];"
+            f"[dv_bi]{crop('bottom')},pad=1080:1920:0:{1920 - HALF_SIZE}[dv_b];"
             f"movie='{mask}',loop=loop={frames}:size=1:start=0,setpts=N/{FPS}/TB,format=gray[dv_mask];"
-            f"[dv_blur][dv_mask]alphamerge[dv_seam];[dv_base][dv_seam]overlay=0:{seam_y}:shortest=1")
+            f"[dv_t0][dv_mask]alphamerge[dv_t];[dv_b][dv_t]overlay=0:0:shortest=1")
 
 
 def video_filter(info, settings, prepared, captions=None):

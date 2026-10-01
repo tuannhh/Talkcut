@@ -64,6 +64,17 @@ clip-scoped portrait suggestion job using FFmpeg-decoded stills, avoiding the
 host OpenCV AV1 seek limitation. No SQLite migration; await user review before
 stable promotion.
 
+## v0.12.0-rc.1 — local AI director (candidate)
+
+Fully automatic 9:16 framing: exact cuts, people clustering, voice-to-person
+mapping, host/guest roles, stacked guest-top/host-bottom dissolve, virtual
+camera, head-safe composition, silence/filler tightening with punch-in jump
+cuts, straight cuts by default, captions between the two people in stacked
+frames. Built on origin/main 8912bd8 (GPU/CPU image).
+Rollback target remains the accepted stable `v0.11.0`. Not stable until the
+user accepts it in the running editor. Evidence: VALIDATION.md
+"v0.12.0-rc.1".
+
 ## v0.11.0 — stacked two-frame composite (stable, accepted)
 
 Adds AI-detected wide-two-person moments composited into a fixed top/bottom

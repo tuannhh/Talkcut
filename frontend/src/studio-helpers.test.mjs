@@ -55,3 +55,13 @@ test('fixed subject uses explicit source-time positions without interpolation',a
  assert.deepEqual(staticCenter(s,114.99),{x:.8,y:.3});
  assert.deepEqual(staticCenter(s,115),{x:.2,y:.5});
 });
+test('captions move between the two people of a stacked frame, except under the opening title',async()=>{
+ const {captionY}=await import('./studio-helpers.mjs');
+ const stacked=[{start:2,end:5}],blend={caption_y:.5},s={caption_y:.73,main_title_enabled:false};
+ assert.equal(captionY(s,stacked,1,blend),.73);
+ assert.equal(captionY(s,stacked,3,blend),.5);
+ assert.equal(captionY(s,stacked,5,blend),.73);
+ assert.equal(captionY(s,null,3,null),.73);
+ assert.equal(captionY({...s,main_title_enabled:true,main_title_seconds:3},stacked,2.5,blend),.73);
+ assert.equal(captionY({...s,main_title_enabled:true,main_title_seconds:3},stacked,3.5,blend),.5);
+});

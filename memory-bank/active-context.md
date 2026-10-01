@@ -597,3 +597,61 @@ creates shortcuts; Docker stays a prerequisite the installer detects.
   land incl. 2GB tar + unins000.exe; Desktop + Start Menu "TalkCut Studio" group
   with 3 shortcuts, correct target(start.bat)/workdir/icon; silent uninstall ->
   app dir, desktop lnk, start-menu group all removed clean.
+
+## v14 (candidate `v0.12.0-rc.1`) — local AI director, fully automatic framing — 2026-09-30
+
+User request (verbatim intent): the old app framed badly (faces cut, meaningless
+crops, unintelligent splicing); make it edit "như có senior editor thực thụ".
+Decisions the user made in this session:
+- Transitions: straight cuts ("Cắt thẳng"); Mix stays optional.
+- Smart splicing: speaker on top, MC below, "1 lớp layer hòa trộn 2 frame hình
+  thành 1"; plus a virtual camera following the speaker and removal of
+  silences/filler sounds.
+- Subject selection: fully automatic; manual framing only as an override.
+- Talk shows rarely have faceless shots; the hard case is wide/angled shots of
+  both people that used to be cropped through the middle or half a speaker.
+  The AI must keep the whole speaker in frame.
+
+What exists now (`backend/director.py`, `DirectorPanel.jsx`):
+- Auto mode = AI director. One FFmpeg decode yields 6 fps scouting proxies,
+  2 fps stills and a native-rate `scdet` frame difference; cuts land on the
+  exact source frame and on the first 30 fps output frame of the new shot.
+- SCRFD/ArcFace faces (+5 landmarks) are tracked per shot and clustered into
+  people (co-visible faces never merge; a sparse profile track attaches to the
+  closest established person). Embeddings are never persisted.
+- Diarized voices are chunk-scoped (`c<n>:spk:k`, 5-minute STT requests) and
+  mapped one-to-one to people from what the camera showed while they spoke.
+  The host comes from transcript text (Gemini, conf ≥ .6, cached per source as
+  `roles-v1.json`), else a question/talk-share heuristic. `Đổi vai` swaps.
+- Wide two-person shot → stacked frame: guest top, host bottom, two square
+  1080 halves overlapping 240 px with a smoothstep dissolve (no blurred band).
+  Heads are kept out of the blend zone. A face cut by the frame edge is never
+  stacked. Otherwise a virtual camera cuts to whoever holds the floor
+  (turns ≥ 1.2 s, segments ≥ 1 s). Listener shots keep the talk audio.
+- Composition: whole head incl. the back of a turned head (`safe_box`), eyes on
+  the upper third, look room toward the gaze, never half of another face.
+- Pauses/fillers are removed only where both joins sit on quiet audio; a gap
+  with missed syllables is never cut; joins on the 30 fps grid; 8 ms audio
+  fades; alternate slight punch-in at each jump cut. Captions stay on measured
+  word timings (ASS applied before `select`).
+- Captions in a stacked frame sit in the blend zone between the two people
+  (y = 960/1920, `STACKED_CAPTION_Y`) instead of over the host's face; a
+  phrase crossing a stacked cut is split exactly at that cut. While the
+  opening title holds the middle, captions keep the user's position. The
+  preview uses `plan.blend.caption_y` through `captionY()`.
+- Preview reads the same prepared plan (blur fill, stacked blend stops,
+  skipped pauses, output clock) as the export.
+- Settings v6: `silence_trim`, `punch_in`, `swap_roles`; saved ≤v5 clips move to
+  hard cuts once, an explicitly chosen Mix is kept.
+
+Integration note: local `main` had been 10 commits behind `origin/main`
+(GPU/CPU merged image, AV1 decode, render progress, caption-size fix, Windows
+installer). The director commit was rebased onto `origin/main` 8912bd8 and
+both images rebuilt from the merged tree. Upstream's stronger stacked seam
+(stacked_view v2) only serves the legacy manual stacked flow now.
+
+Evidence: see VALIDATION.md "v0.12.0-rc.1". Not stable; awaits the user's
+review in the running editor. Legacy auto-mode code (subject_tracking,
+stacked_view detect/assemble + endpoints, focus Gemini analysis,
+face_tracking, TrackingSubjects.jsx) is unused by auto mode and is scheduled
+for removal in a follow-up commit.
