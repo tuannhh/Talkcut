@@ -102,6 +102,20 @@ def probe(path):
     return result
 
 
+def peak_db(path, timeout=300):
+    """Peak level of the first audio stream in dBFS (-91 means digital silence)."""
+    import re
+    try:
+        p = subprocess.run([str(x) for x in [FFMPEG, '-hide_banner', '-nostats', '-i', path, '-map', '0:a:0',
+                                             '-af', 'volumedetect', '-f', 'null', '-']], capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        raise MediaError('Xử lý quá thời gian cho phép. Thử một nguồn ngắn hơn.') from None
+    match = re.search(r'max_volume:\s*(-?[\d.]+|-inf) dB', p.stderr.decode(errors='replace'))
+    if p.returncode or not match:
+        raise MediaError('Không đo được âm lượng của đoạn audio.')
+    return -91.0 if match.group(1) == '-inf' else float(match.group(1))
+
+
 def frame(path, dest, seconds=0):
     ffmpeg(['-ss', str(seconds), *hwaccel_input_args(), '-i', path, '-frames:v', '1', '-vf', 'scale=720:-2', dest], 120)
     return dest

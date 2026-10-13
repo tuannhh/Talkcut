@@ -22,3 +22,25 @@ MAX_BYTES = int(float(os.getenv('MAX_UPLOAD_GB', '10')) * 1024 ** 3)
 # auto: use it when a GPU + capable ffmpeg are both detected; cuda: force on
 # (fails loudly if unavailable); cpu: force the original libx264 path.
 RENDER_ACCEL = os.getenv('RENDER_ACCEL', 'auto').lower()
+
+# Google STT requests are network-bound: several five-minute chunks of a long
+# talk run at once (each chunk is cached, so a retry only redoes missing ones).
+STT_PARALLEL = max(1, min(8, int(os.getenv('STT_PARALLEL', '4'))))
+
+# Shared server edition: accounts issued by an administrator. Off for the
+# personal desktop install. Origins allowed to send writes besides the page's
+# own host (comma separated, e.g. https://talkcut.misa.local).
+AUTH_ENABLED = os.getenv('TALKCUT_AUTH', 'off').lower() in ('1', 'on', 'true', 'yes')
+ALLOWED_ORIGINS = {o.strip().rstrip('/') for o in os.getenv('TALKCUT_ALLOWED_ORIGINS', '').split(',') if o.strip()}
+# auto: Secure cookie when the request arrived over HTTPS (X-Forwarded-Proto from the proxy).
+COOKIE_SECURE = os.getenv('TALKCUT_COOKIE_SECURE', 'auto').lower()
+
+# Worker threads per job lane (see pipeline.LANES). Rendering and face framing
+# are CPU heavy: raise them only on a server with spare cores and memory.
+LANE_WORKERS = {lane: max(1, min(8, int(os.getenv(f'{lane.upper()}_WORKERS', '1')))) for lane in ('render', 'framing', 'ingest', 'ai')}
+# After AI suggests clips, prepare the framing of the best N in the background
+# so they open ready (0 = only when someone opens a clip).
+PREPARE_FRAMING_TOP = max(0, min(50, int(os.getenv('PREPARE_FRAMING_TOP', '0'))))
+# Light H.264 preview for sources the office browsers decode poorly (4K, AV1,
+# HEVC...): auto = only for those, off = always play the original.
+PREVIEW_PROXY = os.getenv('PREVIEW_PROXY', 'off').lower()

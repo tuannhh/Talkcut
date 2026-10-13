@@ -1,8 +1,13 @@
+import contextvars
 import json
 import sqlite3
 import time
 import uuid
 from .config import DATA
+
+# Who acts in the current request or queued job ({'id', 'name'}); records
+# created meanwhile remember it as created_by.
+actor = contextvars.ContextVar('talkcut_actor', default=None)
 
 
 def connect():
@@ -20,6 +25,8 @@ def init():
 
 def create(kind, payload):
     item = {'id': uuid.uuid4().hex, 'created': time.time(), **payload}
+    if actor.get() and 'created_by' not in item:
+        item['created_by'] = actor.get()
     with connect() as db:
         db.execute('INSERT INTO records VALUES (?, ?, ?, ?)', (item['id'], kind, item['created'], json.dumps(item, ensure_ascii=False)))
     return item

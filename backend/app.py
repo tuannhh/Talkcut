@@ -7,13 +7,15 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
-from . import config, store, pipeline, google_ai, presets, accel_settings, gpu_profile, face_engine
+from . import config, store, pipeline, google_ai, presets, accel_settings, gpu_profile, face_engine, auth
 from .media import probe, MediaError
-from .schemas import ImportRequest, AnalyzeRequest, ClipEdit, Settings, BatchBrand, AccelRequest
+from .schemas import ImportRequest, AnalyzeRequest, ClipEdit, Settings, BatchBrand, AccelRequest, LoginRequest, PasswordChange, UserCreate, UserUpdate, UploadStart
 
 
 @asynccontextmanager
 async def lifespan(app):
+    auth.bootstrap()
+    clean_stale_uploads()
     pipeline.start_worker()
     yield
 
@@ -21,18 +23,125 @@ async def lifespan(app):
 app = FastAPI(title='TalkCut Studio', lifespan=lifespan)
 
 
+# Reachable without a session: the login screen needs these.
+PUBLIC_PATHS = {'/api/health', '/api/auth/login', '/api/auth/me', '/api/auth/logout'}
+# Still allowed while a reset password must be replaced.
+PASSWORD_PATHS = PUBLIC_PATHS | {'/api/auth/password'}
+
+
+def trusted_origin(request, origin):
+    """Writes come from the app's own page: localhost, its own host, or a configured origin."""
+    from urllib.parse import urlparse
+    parsed = urlparse(origin)
+    if parsed.hostname in ('localhost', '127.0.0.1', '::1') or origin.rstrip('/') in config.ALLOWED_ORIGINS:
+        return True
+    host = (request.headers.get('x-forwarded-host') or request.headers.get('host') or '').split(',')[0].strip().lower()
+    return bool(parsed.netloc) and parsed.netloc.lower() == host
+
+
 @app.middleware('http')
-async def local_write_guard(request: Request, call_next):
-    # This is a local personal tool: deny cross-origin browser writes.
+async def access_guard(request: Request, call_next):
+    # Deny cross-origin browser writes (the session cookie is also SameSite=Lax).
     if request.method not in ('GET', 'HEAD', 'OPTIONS'):
         origin = request.headers.get('origin')
-        from urllib.parse import urlparse
-        if origin and urlparse(origin).hostname not in ('localhost', '127.0.0.1', '::1'):
-            return JSONResponse({'detail': 'Chỉ cho phép thao tác từ ứng dụng local.'}, status_code=403)
-    response = await call_next(request)
+        if origin and not trusted_origin(request, origin):
+            return JSONResponse({'detail': 'Chỉ cho phép thao tác từ chính trang TalkCut.'}, status_code=403)
+    path, user = request.url.path, None
+    if config.AUTH_ENABLED and path.startswith(('/api/', '/media/')) and path not in PUBLIC_PATHS:
+        from starlette.concurrency import run_in_threadpool
+        user = await run_in_threadpool(auth.session_user, request.cookies.get(auth.COOKIE))
+        if not user:
+            return JSONResponse({'detail': 'Phiên đăng nhập đã hết. Hãy đăng nhập lại.'}, status_code=401)
+        if user.get('must_change_password') and path not in PASSWORD_PATHS:
+            return JSONResponse({'detail': 'Hãy đổi mật khẩu trước khi tiếp tục.'}, status_code=403)
+    request.state.user = user
+    token = store.actor.set(auth.owner(user))
+    try:
+        response = await call_next(request)
+    finally:
+        store.actor.reset(token)
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Referrer-Policy'] = 'same-origin'
     return response
+
+
+@app.exception_handler(auth.AuthError)
+async def auth_error(request, exc):
+    return JSONResponse({'detail': str(exc)}, status_code=exc.status)
+
+
+def acting_user(request):
+    return getattr(request.state, 'user', None)
+
+
+def require_admin(request):
+    user = acting_user(request)
+    if config.AUTH_ENABLED and (not user or user['role'] != 'admin'):
+        raise auth.AuthError('Chỉ quản trị viên được thực hiện thao tác này.', 403)
+    return user
+
+
+def require_owner(request, record):
+    if not auth.may_manage(acting_user(request), record):
+        raise auth.AuthError('Chỉ người tạo hoặc quản trị viên được thực hiện thao tác này.', 403)
+
+
+def secure_cookie(request):
+    if config.COOKIE_SECURE in ('on', '1', 'true'):
+        return True
+    if config.COOKIE_SECURE in ('off', '0', 'false'):
+        return False
+    return request.url.scheme == 'https' or request.headers.get('x-forwarded-proto', '').split(',')[0].strip() == 'https'
+
+
+@app.post('/api/auth/login')
+def login(body: LoginRequest, request: Request):
+    if not config.AUTH_ENABLED:
+        raise ValueError('Ứng dụng đang chạy ở chế độ cá nhân, không cần đăng nhập.')
+    user, token = auth.login(body.username, body.password, request.client.host if request.client else '')
+    response = JSONResponse({'user': auth.public(user)})
+    response.set_cookie(auth.COOKIE, token, max_age=auth.SESSION_SECONDS, httponly=True, samesite='lax', secure=secure_cookie(request), path='/')
+    return response
+
+
+@app.post('/api/auth/logout')
+def logout(request: Request):
+    auth.logout(request.cookies.get(auth.COOKIE))
+    response = JSONResponse({'ok': True})
+    response.delete_cookie(auth.COOKIE, path='/')
+    return response
+
+
+@app.get('/api/auth/me')
+def me(request: Request):
+    user = auth.session_user(request.cookies.get(auth.COOKIE)) if config.AUTH_ENABLED else None
+    return {'auth_enabled': config.AUTH_ENABLED, 'user': user and auth.public(user)}
+
+
+@app.post('/api/auth/password')
+def change_password(body: PasswordChange, request: Request):
+    user = acting_user(request)
+    if not user:
+        raise ValueError('Ứng dụng đang chạy ở chế độ cá nhân, không có mật khẩu.')
+    return {'user': auth.public(auth.change_password(user, body.current_password, body.new_password))}
+
+
+@app.get('/api/users')
+def list_users(request: Request):
+    require_admin(request)
+    return [auth.public(u) for u in auth.users()]
+
+
+@app.post('/api/users')
+def create_user(body: UserCreate, request: Request):
+    require_admin(request)
+    return auth.public(auth.create_user(body.username, body.display_name, body.password, body.role))
+
+
+@app.put('/api/users/{id}')
+def update_user(id: str, body: UserUpdate, request: Request):
+    actor = require_admin(request)
+    return auth.public(auth.update_user(id, actor, **body.model_dump()))
 
 
 @app.exception_handler(KeyError)
@@ -57,7 +166,7 @@ async def bad_media(request, exc):
 
 @app.get('/api/health')
 def health():
-    return {'status': 'ok', 'google_configured': bool(config.API_KEY), 'models': {'content': config.CONTENT_MODEL, 'stt': config.STT_MODEL, 'tts': config.TTS_MODEL}, 'source_root': str(config.SOURCE_ROOT), 'max_upload_gb': config.MAX_BYTES / 1024**3}
+    return {'status': 'ok', 'auth_enabled': config.AUTH_ENABLED, 'google_configured': bool(config.API_KEY), 'models': {'content': config.CONTENT_MODEL, 'stt': config.STT_MODEL, 'tts': config.TTS_MODEL}, 'source_root': str(config.SOURCE_ROOT), 'max_upload_gb': config.MAX_BYTES / 1024**3}
 
 
 @app.get('/api/accel')
@@ -72,7 +181,8 @@ def get_accel():
 
 
 @app.post('/api/accel')
-def set_accel(body: AccelRequest):
+def set_accel(body: AccelRequest, request: Request):
+    require_admin(request)  # one setting for the whole server
     return accel_settings.set_render_accel(body.render_accel)
 
 
@@ -85,9 +195,13 @@ def studio():
         source.pop('transcript', None)
     for clip in result['clips']:
         clip.pop('words', None)
+    positions = pipeline.queue_positions(result['jobs'])
     for job in result['jobs']:
         job.pop('payload', None)
         job.pop('result', None)
+        job['lane'] = pipeline.LANE_OF.get(job['kind'], 'ai')
+        if job['id'] in positions:
+            job['position'] = positions[job['id']]
     return result
 
 
@@ -166,7 +280,8 @@ def create_preset(body: presets.PresetRequest):
 
 
 @app.put('/api/presets/{id}')
-def update_preset(id: str, body: presets.PresetRequest):
+def update_preset(id: str, body: presets.PresetRequest, request: Request):
+    require_owner(request, store.get(id,'preset'))
     return presets.save(body,id)
 
 
@@ -176,11 +291,97 @@ def apply_preset(id: str, body: Settings):
 
 
 @app.delete('/api/presets/{id}')
-def delete_preset(id: str):
-    store.get(id,'preset')
+def delete_preset(id: str, request: Request):
+    require_owner(request, store.get(id,'preset'))
     with store.connect() as db:
         db.execute("DELETE FROM records WHERE id=? AND kind='preset'",(id,))
     return {'deleted':True}
+
+
+VIDEO_EXTENSIONS = ('.mp4', '.mov', '.mkv', '.webm', '.m4v', '.avi', '.mts')
+# Large sources arrive in pieces: a dropped connection resumes from the last
+# piece instead of restarting a multi-gigabyte upload, and the reverse proxy
+# never needs a request body larger than one piece.
+UPLOAD_CHUNK = 8 * 1024 ** 2
+UPLOAD_DAYS = 3
+_upload_locks = {}
+
+
+def upload_part(id):
+    return config.DATA / 'uploads' / (id + '.part')
+
+
+def clean_stale_uploads():
+    import time
+    for item in store.listing('upload'):
+        if time.time() - item['created'] > UPLOAD_DAYS * 86400:
+            upload_part(item['id']).unlink(missing_ok=True)
+            store.delete(item['id'], 'upload')
+
+
+@app.post('/api/uploads')
+def start_upload(body: UploadStart):
+    name = Path(body.name).name
+    if Path(name).suffix.lower() not in VIDEO_EXTENSIONS:
+        raise ValueError('Hỗ trợ MP4, MOV, MKV, WEBM, M4V, AVI, MTS.')
+    if body.size > config.MAX_BYTES:
+        raise HTTPException(413, 'File vượt giới hạn dung lượng.')
+    item = store.create('upload', {'name': name, 'size': body.size})
+    upload_part(item['id']).parent.mkdir(exist_ok=True)
+    upload_part(item['id']).touch()
+    return {'id': item['id'], 'received': 0, 'size': body.size, 'chunk_size': UPLOAD_CHUNK}
+
+
+@app.get('/api/uploads/{id}')
+def upload_status(id: str, request: Request):
+    item = store.get(id, 'upload')
+    require_owner(request, item)
+    part = upload_part(id)
+    return {'id': id, 'received': part.stat().st_size if part.exists() else 0, 'size': item['size'], 'chunk_size': UPLOAD_CHUNK}
+
+
+@app.put('/api/uploads/{id}')
+async def upload_chunk(id: str, request: Request, offset: int = Query(ge=0)):
+    import asyncio
+    from starlette.concurrency import run_in_threadpool
+    item = await run_in_threadpool(store.get, id, 'upload')
+    require_owner(request, item)
+    async with _upload_locks.setdefault(id, asyncio.Lock()):
+        part = upload_part(id)
+        received = part.stat().st_size if part.exists() else 0
+        if offset != received:
+            # Another tab or a retried request already stored this piece.
+            return JSONResponse({'detail': 'Vị trí tải lên đã thay đổi.', 'received': received}, status_code=409)
+        body = await request.body()
+        if len(body) > UPLOAD_CHUNK:
+            raise HTTPException(413, 'Mỗi lần gửi tối đa 8 MB.')
+        if not body or received + len(body) > item['size']:
+            raise ValueError('Dữ liệu tải lên không khớp kích thước file.')
+        with part.open('ab') as out:
+            out.write(body)
+        return {'received': received + len(body)}
+
+
+@app.post('/api/uploads/{id}/complete')
+async def complete_upload(id: str, request: Request):
+    from starlette.concurrency import run_in_threadpool
+    item = await run_in_threadpool(store.get, id, 'upload')
+    require_owner(request, item)
+    part = upload_part(id)
+    if not part.exists() or part.stat().st_size != item['size']:
+        raise ValueError('File chưa tải lên đủ. Hãy tiếp tục tải.')
+    source = store.create('source', {'title': item['name'], 'kind': 'upload', 'status': 'importing'})
+    folder = config.DATA / 'sources' / source['id']
+    folder.mkdir()
+    path = folder / ('original' + Path(item['name']).suffix.lower())
+    part.replace(path)
+    store.delete(id, 'upload')
+    _upload_locks.pop(id, None)
+    try:
+        return await run_in_threadpool(pipeline.finish_source, source, path)
+    except Exception:
+        store.update(source['id'], status='failed')
+        raise
 
 
 @app.post('/api/sources/upload')
@@ -304,8 +505,9 @@ def retry(id: str):
 
 
 @app.delete('/api/jobs/{id}')
-def dismiss_job(id: str):
+def dismiss_job(id: str, request: Request):
     job = store.get(id, 'job')
+    require_owner(request, job)
     if job['status'] in ('queued', 'running'):
         raise ValueError('Không thể bỏ một tác vụ đang chạy.')
     store.delete(id, 'job')
@@ -345,8 +547,9 @@ def download(id: str):
 
 
 @app.delete('/api/exports/{id}')
-def delete_export(id: str):
+def delete_export(id: str, request: Request):
     item = store.get(id, 'export')
+    require_owner(request, item)
     target = (config.DATA / item['path']).resolve()
     if target.is_relative_to(config.DATA / 'renders') and target.is_file():
         target.unlink(missing_ok=True)

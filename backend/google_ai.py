@@ -112,10 +112,9 @@ def transcribe(path):
             'input': [{'type': 'audio', 'uri': file['uri'], 'mime_type': 'audio/mp3'}],
             'generation_config': {'transcription_config': {'mode': {'type': 'verbatim', 'diarization_mode': 'speaker', 'timestamp_granularities': ['word']}}},
         })
-        words = parse_words(result)
-        if not words:
-            raise AIError('Google STT không trả mốc thời gian từng từ. Không thể tạo karaoke chính xác; hãy thử đoạn có giọng nói rõ hơn.')
-        return words
+        # An empty list is a valid answer for one chunk (music, a waiting screen);
+        # the caller decides whether the whole source lacks speech.
+        return parse_words(result)
     finally:
         try:
             httpx.delete(f"{BASE}/{file['name']}", headers={'x-goog-api-key': config.API_KEY}, timeout=30)

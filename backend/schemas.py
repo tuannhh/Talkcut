@@ -180,3 +180,32 @@ class ClipEdit(BaseModel):
         if not 1 <= self.end - self.start <= 600:
             raise ValueError('Clip phải dài từ 1 đến 600 giây.')
         return self
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(max_length=80)
+    password: str = Field(max_length=200)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(max_length=200)
+    new_password: str = Field(max_length=200)
+
+
+class UserCreate(BaseModel):
+    username: str = Field(max_length=40)
+    display_name: str = Field(default='', max_length=80)
+    role: Literal['admin', 'editor'] = 'editor'
+    password: str = Field(max_length=200)
+
+
+class UserUpdate(BaseModel):
+    display_name: str | None = Field(default=None, max_length=80)
+    role: Literal['admin', 'editor'] | None = None
+    active: bool | None = None
+    password: str | None = Field(default=None, max_length=200)
+
+
+class UploadStart(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    size: int = Field(gt=0)
