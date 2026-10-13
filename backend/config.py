@@ -17,6 +17,13 @@ FFMPEG = os.getenv('FFMPEG', 'ffmpeg')
 FFPROBE = os.getenv('FFPROBE', 'ffprobe')
 THREADS = str(max(1, min(16, int(os.getenv('RENDER_THREADS', '4')))))
 MAX_BYTES = int(float(os.getenv('MAX_UPLOAD_GB', '10')) * 1024 ** 3)
+# libx264 preset for exports. Measured on 60 s of 1080x1920 output at crf 18:
+# veryfast encodes 2-2.7x faster than fast with SSIM 0.99 against it and a
+# smaller file, so a CPU-only server should use veryfast.
+X264_PRESETS = ('ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow')
+RENDER_PRESET = os.getenv('RENDER_PRESET', 'fast').lower()
+if RENDER_PRESET not in X264_PRESETS:
+    RENDER_PRESET = 'fast'
 
 # Optional NVIDIA acceleration for ffmpeg (NVENC encode / CUDA decode).
 # auto: use it when a GPU + capable ffmpeg are both detected; cuda: force on

@@ -76,6 +76,15 @@ def test_repeated_wrong_passwords_are_slowed_down(server):
         'Tên đăng nhập hoặc mật khẩu chưa đúng.'
 
 
+def test_guessing_from_many_addresses_is_still_capped(server):
+    for n in range(auth.MAX_NAME_FAILURES):
+        with pytest.raises(auth.AuthError):
+            auth.login('admin', 'wrong-pass', f'10.0.0.{n}')
+    with pytest.raises(auth.AuthError) as blocked:
+        auth.login('admin', 'admin-pass-1', '10.0.1.1')
+    assert blocked.value.status == 429
+
+
 def test_records_remember_who_made_them_and_only_owner_or_admin_may_delete(server):
     admin, editor = server
     lan = signed_in('lan.nt', 'editor-pass-1')

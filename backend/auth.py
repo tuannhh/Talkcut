@@ -128,27 +128,33 @@ def change_password(user, current_password, new_password):
     return store.update(user['id'], password_hash=hash_password(new_password), must_change_password=False)
 
 
-# Repeated wrong passwords for one name from one address wait 15 minutes.
+# Repeated wrong passwords for one name from one address wait 15 minutes. A
+# looser cap per name across all addresses stops guessing from rotating (or
+# spoofed forwarded) addresses.
 _failures, _failures_lock = {}, threading.Lock()
-MAX_FAILURES, WINDOW = 5, 15 * 60
+MAX_FAILURES, MAX_NAME_FAILURES, WINDOW = 5, 20, 15 * 60
 
 
 def login(username, password, address):
-    key = ((username or '').strip().lower(), address or '')
+    name = (username or '').strip().lower()
+    limits = {(name, address or ''): MAX_FAILURES, (name, '*'): MAX_NAME_FAILURES}
     now = time.time()
     with _failures_lock:
-        recent = [t for t in _failures.get(key, []) if now - t < WINDOW]
-        _failures[key] = recent
-        if len(recent) >= MAX_FAILURES:
-            raise AuthError('Đăng nhập sai quá nhiều lần. Hãy thử lại sau 15 phút.', 429)
-    user = find(key[0])
+        for key, limit in limits.items():
+            recent = [t for t in _failures.get(key, []) if now - t < WINDOW]
+            _failures[key] = recent
+            if len(recent) >= limit:
+                raise AuthError('Đăng nhập sai quá nhiều lần. Hãy thử lại sau 15 phút.', 429)
+    user = find(name)
     valid = verify_password(password or '', user['password_hash'] if user else _DUMMY)
     if not user or not valid or not user.get('active'):
         with _failures_lock:
-            _failures.setdefault(key, []).append(now)
+            for key in limits:
+                _failures.setdefault(key, []).append(now)
         raise AuthError('Tên đăng nhập hoặc mật khẩu chưa đúng.' if not user or not valid else 'Tài khoản đã bị khóa. Hãy liên hệ quản trị viên.', 401)
     with _failures_lock:
-        _failures.pop(key, None)
+        for key in limits:
+            _failures.pop(key, None)
     token = secrets.token_urlsafe(32)
     with store.connect() as db:
         db.execute('DELETE FROM sessions WHERE expires < ?', (now,))

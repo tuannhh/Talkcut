@@ -1,7 +1,7 @@
 import json
 import subprocess
 from pathlib import Path
-from .config import FFMPEG, FFPROBE, THREADS, RENDER_ACCEL
+from .config import FFMPEG, FFPROBE, THREADS, RENDER_ACCEL, RENDER_PRESET
 from . import gpu_profile
 
 
@@ -132,7 +132,7 @@ def encode_args():
         return ['-c:v', 'h264_nvenc', '-preset', 'p5', '-tune', 'hq', '-rc', 'vbr', '-cq', '23',
                 '-b:v', '6M', '-maxrate', '9M', '-bufsize', '12M',
                 '-pix_fmt', 'yuv420p', '-r', '30', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', '-movflags', '+faststart']
-    return ['-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-threads', THREADS, '-pix_fmt', 'yuv420p', '-r', '30', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', '-movflags', '+faststart']
+    return ['-c:v', 'libx264', '-preset', RENDER_PRESET, '-crf', '18', '-threads', THREADS, '-pix_fmt', 'yuv420p', '-r', '30', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', '-movflags', '+faststart']
 
 
 def normalized_video(path, target):
