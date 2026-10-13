@@ -1,0 +1,9 @@
+.source-card{position:relative;display:grid}
+.source-card>.library-source{width:100%}
+.source-card>.source-delete{position:absolute;top:10px;right:10px;z-index:1}
+.delete-summary{list-style:none;margin:0 0 16px;padding:0;display:grid;gap:8px}
+.delete-summary li{display:flex;justify-content:space-between;gap:16px;align-items:baseline;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:12px}
+.delete-summary li span{color:var(--muted);white-space:nowrap}
+.delete-summary li strong{font-weight:500}
+.delete-note{font-size:11px;color:var(--muted);margin:6px 0 0;line-height:1.6}
+.delete-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;flex-wrap:wrap}

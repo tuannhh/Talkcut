@@ -419,3 +419,52 @@ Limits:
 - Queue positions and the preview copy are covered by tests, but were not
   checked in the browser.
 - Not a stable release until the user accepts it.
+
+## v0.13.0-rc.2 — delete old sources — 2026-10-13
+
+Requested by the user to free server disk.
+
+What deleting a source does:
+
+- Removes the source folder: original, preview copy, transcript, thumbnails.
+- Removes its clips, the job history of the source and its clips, and the
+  framing caches (director, focus, stacked) of those clips.
+- Keeps exported videos unless the user chooses to delete them.
+- Refuses while any job for the source or its clips is queued or running
+  (409).
+
+Who may delete:
+
+- Personal install: the single user.
+- Server: the owner or an administrator. An exported video someone else made
+  is kept even when its source is deleted with "delete exports".
+
+Tests:
+
+- 225 Python tests pass, 5 of them new in `tests/test_source_removal.py`:
+  - files and records removed, other sources untouched;
+  - exports kept by default and deleted on request;
+  - busy source refused;
+  - 404 for an unknown source and 422 for an invalid option;
+  - owner, other editor and admin rights.
+- 11 JS tests pass; the Vite build passes.
+- Live record counts were identical before and after the run.
+
+Browser, isolated server stack (port 8093, seeded test sources only):
+
+- **Editor's view.** The editor sees **Xóa** only on their own source.
+- **Dialog.** It listed 22 MB of source files, 3 clips with 2 MB of caches,
+  and 1 export of 22 MB that is kept unless the switch is turned on.
+- **Delete.** Deleting reported "giải phóng 23 MB, giữ lại 1 video đã xuất".
+  On disk, the source folder and its 6 cache folders were gone and the
+  export file stayed.
+- **Busy source.** With a running job, the dialog showed the warning and
+  disabled the button; a direct `DELETE` answered 409.
+- **Open source.** Deleting the admin's source while it was open in Studio
+  returned Studio to its empty start page without errors.
+- **Afterwards.** The store held 0 sources, clips and jobs and 1 kept export.
+
+Limit: framing caches made by older analysis versions, or for earlier trims
+of a clip, cannot be traced to their source and stay in `/data/jobs`. On
+this machine the whole cache folder is 359 MB, about 3% of the data.
+

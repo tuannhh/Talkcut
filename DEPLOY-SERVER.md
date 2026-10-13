@@ -41,7 +41,16 @@ Các con số trên đo trên máy phát triển. Cần đo lại trên máy ch�
 - Bản xem trước: khoảng 0,7 GB.
 - Mỗi clip xuất ra: 30–60 MB cho mỗi phút.
 
-Với 1–2 video mỗi tuần, nên dự trù 1–2 TB mỗi năm và có kế hoạch dọn nguồn cũ.
+Với 1–2 video mỗi tuần, nên dự trù 1–2 TB mỗi năm nếu không dọn gì.
+
+**Dọn nguồn cũ.** Trong **Thư viện nguồn**, nút **Xóa** trên mỗi nguồn sẽ:
+
+- Hiện dung lượng sẽ được giải phóng trước khi xóa.
+- Xóa video gốc, bản xem trước, lời thoại, các clip và khung hình đã tính.
+- Mặc định giữ lại các video đã xuất; người dùng có thể chọn xóa luôn.
+- Không cho xóa nguồn đang có tác vụ chạy hoặc đang chờ.
+
+Nên nhắc người dùng xóa nguồn khi đã xuất xong clip.
 
 ## 2. Yêu cầu mạng
 
@@ -177,8 +186,9 @@ Bảo mật đăng nhập:
 Phân quyền:
 
 - Mọi người cùng thấy kho nguồn và clip của nhóm.
-- Chỉ người tạo hoặc quản trị viên được xóa video đã xuất, mẫu thương hiệu và
-  tác vụ.
+- Chỉ người tạo hoặc quản trị viên được xóa nguồn video, video đã xuất, mẫu
+  thương hiệu và tác vụ. Khi người tải nguồn lên xóa nguồn, video do người
+  khác xuất từ nguồn đó vẫn được giữ.
 - Chỉ quản trị viên được đổi cấu hình tăng tốc phần cứng.
 
 ## 6. Tinh chỉnh tài nguyên (trong `.env`)

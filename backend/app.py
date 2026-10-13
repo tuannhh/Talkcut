@@ -561,6 +561,26 @@ def delete_export(id: str, request: Request):
     return {'deleted': True}
 
 
+@app.get('/api/sources/{id}/usage')
+def source_usage(id: str, request: Request):
+    """What deleting this source would remove and free."""
+    from . import removal
+    source = store.get(id, 'source')
+    return {**removal.summary(source), 'can_delete': auth.may_manage(acting_user(request), source)}
+
+
+@app.delete('/api/sources/{id}')
+def delete_source(id: str, request: Request, exports: str = Query('keep', pattern='^(keep|delete)$')):
+    from . import removal
+    source = store.get(id, 'source')
+    require_owner(request, source)
+    user = acting_user(request)
+    try:
+        return removal.remove(source, exports == 'delete', lambda record: auth.may_manage(user, record))
+    except removal.SourceBusy as busy:
+        raise HTTPException(409, str(busy))
+
+
 @app.get('/media/{path:path}')
 def media(path: str):
     target = (config.DATA / path).resolve()

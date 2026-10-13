@@ -250,3 +250,11 @@ as manual CapCut work; they should only need a browser. Volume: 1–2 4K
   10-01 to 10-13 was lost. `tests/conftest.py` now forces a temporary
   `DATA_DIR`.
 
+## 2026-10-13 — v0.13.0-rc.2: delete old sources
+
+- `DELETE /api/sources/{id}?exports=keep|delete` and
+  `GET /api/sources/{id}/usage` (`backend/removal.py`).
+- Library cards have a **Xóa** button for the owner or an admin. The dialog
+  shows the space each part frees and has a switch to also delete exports.
+- The open source is cleared from Studio when it is deleted.
+

@@ -689,6 +689,9 @@ Next:
 - DevOps deploys and measures.
 - Possible follow-ups:
   - remove legacy auto-mode code (listed in the v0.12 section);
-  - retention/cleanup for old sources on the server;
-  - a source delete for owners and admins.
+  - automatic retention (e.g. remind or expire sources after N days);
+  - a sweep for untraceable old caches.
+
+v0.13.0-rc.2 (same day): source deletion as requested by the user
+("làm thêm chức năng xóa video nguồn cũ"). Exports are kept by default.
 

@@ -151,4 +151,12 @@ scope; one VM/host with SQLite and the local volume is the intended setup.
 - Frontend: `Root` asks `/api/auth/me`; `LoginScreen` /
   `ForcedPasswordScreen` / `App`. Any 401 dispatches `talkcut-auth-expired`.
   `Account.jsx` holds the account UI.
+- `backend/removal.py`:
+  - `summary` and `remove` collect a source's clips, the jobs targeting the
+    source or its clips, and its exports (by `source_id`).
+  - Framing cache folders are recomputed from the source file and clip
+    bounds (`director.cache_dir`, `focus.cache_dir`, `stacked_view.cache_dir`),
+    so this must happen before the file is deleted.
+  - Records are deleted in one transaction, then the folders. Export folders
+    are `renders/<job>/`.
 

@@ -64,6 +64,14 @@ clip-scoped portrait suggestion job using FFmpeg-decoded stills, avoiding the
 host OpenCV AV1 seek limitation. No SQLite migration; await user review before
 stable promotion.
 
+## v0.13.0-rc.2 — delete old sources (candidate)
+
+Adds deletion of a source with its clips, jobs and framing caches; exports
+kept unless chosen; refused while jobs run; owner or admin only on the
+server. Otherwise identical to v0.13.0-rc.1. Rollback target remains the
+accepted stable `v0.11.0`. Not stable until the user accepts it. Evidence:
+VALIDATION.md "v0.13.0-rc.2".
+
 ## v0.13.0-rc.1 — internal server edition (candidate)
 
 Shared Talkcut for about 20 MISA staff (4–5 at once) on a CPU-only server:
