@@ -63,8 +63,11 @@ Nên nhắc người dùng xóa nguồn khi đã xuất xong clip.
 
 ## 3. Cài đặt
 
+Mã nguồn nằm ở repo riêng tư `tuannhh/talkcut-server`. Chủ repo cần cấp quyền
+đọc cho tài khoản DevOps, hoặc thêm một deploy key chỉ-đọc cho máy chủ.
+
 ```bash
-git clone https://github.com/<tổ-chức>/Talkcut.git /opt/talkcut
+git clone https://github.com/tuannhh/talkcut-server.git /opt/talkcut
 cd /opt/talkcut
 cp .env.example .env
 ```
