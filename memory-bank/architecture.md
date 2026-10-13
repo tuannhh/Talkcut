@@ -119,3 +119,36 @@ event with `director.caption_y` (clip time, before `select`). The plan carries
 
 `focus.prepared_track`/`static_framing.cached_track` recognise director plans;
 manual framing and centre modes are unchanged.
+
+## v13 server edition (2026-10-13)
+
+The personal Docker install remains the default. `compose.server.yaml` turns
+the same image into a shared server: `TALKCUT_AUTH=on`, CPU-only render and
+face engine, lane workers, preview copies, background framing, memory limits,
+`DATA_PATH` bind mount, port on 127.0.0.1 behind a TLS reverse proxy. This
+replaces the 2026-09-08 note above that a shared deployment still lacked
+authentication, HTTPS origins and job recovery. Cloud Run remains out of
+scope; one VM/host with SQLite and the local volume is the intended setup.
+
+- `backend/auth.py`: users are `user` records; `sessions` table keyed by
+  SHA-256 of the cookie token. `app.access_guard` requires a session for
+  `/api` and `/media` (except health and auth endpoints), blocks everything
+  but the password change while `must_change_password`, rejects cross-origin
+  writes, and sets `store.actor` so `store.create` stamps `created_by`.
+- `pipeline`: `LANES` map job kinds to render / framing / ingest / ai, each a
+  `PriorityQueue` (INTERACTIVE 0, BACKGROUND 1) served by `*_WORKERS`
+  threads; `queue_positions` feeds the job cards. Workers run with the job's
+  creator as actor.
+- Uploads: `POST /api/uploads` → `PUT /api/uploads/{id}?offset=` (≤ 8 MB,
+  409 with the real `received` on a mismatch) → `POST .../complete` →
+  `finish_source`. Parts live in `/data/uploads` and expire after 3 days.
+- `needs_proxy`/`make_proxy`: `preview-1080.mp4` for sources over 1080p
+  class (long side > 1920 or short side > 1080), non-H.264 or non-MP4; the
+  editor plays `preview_path`, analysis and export read `path`.
+- STT: `transcribe_source` runs `STT_PARALLEL` 5-minute chunks
+  (`words-{i}.json` cached); `window_proposals` maps 15-minute Gemini windows
+  in parallel.
+- Frontend: `Root` asks `/api/auth/me`; `LoginScreen` /
+  `ForcedPasswordScreen` / `App`. Any 401 dispatches `talkcut-auth-expired`.
+  `Account.jsx` holds the account UI.
+

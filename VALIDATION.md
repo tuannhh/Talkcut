@@ -305,3 +305,117 @@ tree (origin/main 8912bd8 + director). CPU path on this machine: libx264
 Limits: no precision/recall measurement of speaker-to-person mapping on a
 large set; overlapping speech was not specifically evaluated. Not a
 stable release until the user accepts it.
+
+## v0.13.0-rc.1 — internal server edition — 2026-10-13
+
+Environment: Windows 10, Docker Desktop, i7-12700K / 128 GB (development
+machine). Server behaviour was checked on an isolated second stack
+(`docker compose -p talkcut-authtest -f compose.yaml -f compose.server.yaml`,
+port 8093, its own volume) so the live studio data was never signed into.
+
+Tests:
+
+- 220 Python tests pass in the rebuilt `studio` container. New tests cover:
+  - 13 for accounts (sessions, forced change, roles, owner-only deletes,
+    throttling, including guessing from many addresses);
+  - 3 for chunked uploads (resume, 409 with the real offset, size limits,
+    another user's upload);
+  - 4 for long-talk STT chunks (silent chunk skipped, empty audible chunk
+    retried and then reported as a gap);
+  - 8 for the preview copy with real FFmpeg (which sources get one,
+    landscape and portrait output size, keyframe every second, original kept
+    for export). Writing these found and fixed a bug: a vertical 1080×1920
+    phone video counted as "over 1080p" and got a needless, smaller preview.
+- 11 JS tests pass; the Vite build passes.
+- Live record counts were identical before and after every suite run
+  (`accel_settings 1, clip 28, export 13, job 35, preset 1, source 5`).
+
+Measured cost (clip `6c0477d0`, 211 s, 1080p):
+
+| Machine | Analysis | Render |
+|---|---|---|
+| i7-12700K, unrestricted | 75 s (63 s of it face detection) | 127 s |
+| Simulated office PC (8 shared threads, 8 GB) | 125 s | 304 s |
+
+Decoding 30 s of the 4K AV1 source took 5.0 s, against 2.0 s for 1080p.
+
+Export encode preset, 60 s of 1080×1920 output at crf 18 with 4 threads
+(encode only):
+
+| Source | `fast` | `veryfast` | SSIM, veryfast vs fast |
+|---|---|---|---|
+| 1080p H.264, 20 Mbps | 40.1 s, 53.3 MB | 14.6 s, 43.0 MB | 0.9909 |
+| 4K AV1 | 27.0 s, 29.6 MB | 13.9 s, 25.0 MB | 0.9929 |
+
+The server overlay uses `veryfast`; the personal install keeps `fast`.
+
+Long talk: the 3.9 h livestream `6cc5c5a8` (FHD) analysed end to end.
+
+- STT: 48 five-minute chunks in about 4 min, 44,591 words, no gaps.
+- Gemini windows (parallel): 1 min 25 s.
+- Result: 21 suggested clips, top score 92.
+
+Browser checks on the isolated stack (127.0.0.1:8093, accounts on):
+
+- **Sign-in.** A wrong password shows an error. An issued or reset password
+  opens the forced-change screen; until it is changed, `/api/studio` answers
+  403. The session cookie is not readable from JS.
+- **Account administration.** The admin issued `lan.nt`; the temporary
+  password is shown once.
+- **Editor role.** The editor's account menu has no account administration,
+  and `/api/users` answers 403. Source cards show the owner
+  (`· Quản trị viên`).
+- **Session end.** Ending the editor's sessions on the server returned the
+  open page to the sign-in screen on the next poll.
+- **Resumable upload** of a 19,063,098-byte file in 8 MB pieces:
+  - Closing the dialog during the second piece left 8,388,608 bytes on the
+    server.
+  - Choosing the same file again sent `GET` and then continued from offset
+    8,388,608 to completion.
+  - Both stored sources have the same MD5 as the original, and
+    `/data/uploads` is empty afterwards.
+- **Layout.** The account button works with both the narrow (70 px) and the
+  wide sidebar.
+- **Backup.** The documented SQLite backup command (DEPLOY-SERVER.md §7)
+  produced a readable copy.
+
+Incident during this work, now repaired. An early version of the new test
+files set `DATA_DIR` with `setdefault`. Inside the container that variable
+already points at the live `/data`, so one full test run at 15:38–15:39 wrote
+test records into the live database and deleted its job and preset records.
+
+What was done:
+
+1. Backed up the live database first
+   (`/data/checkpoints/pre-repair-20261013-153947.sqlite`).
+2. Removed the 32 test records, 24 test files and 1 test source folder.
+3. Restored the 34 jobs and the preset "Kênh thử" from the v0.12.0-rc.1
+   snapshot of 10-01.
+4. Saved the result as
+   `/data/checkpoints/post-repair-20261013-154121.sqlite`.
+
+What was checked:
+
+- All sources, clips and exports and their files were intact.
+- The one clip that differed from the snapshot (`defefe4b`) matches the
+  user's own 10-07 settings change.
+
+What was lost:
+
+- Job-history entries created between 10-01 and 10-13. These are only task
+  log records, with no media.
+- Any edits to the preset made after 10-01.
+
+The livestream analysis that was running at the time was re-run and
+completed. Prevention: `tests/conftest.py` now forces a temporary
+`DATA_DIR`, the test modules assert it, and live record counts are compared
+around each run.
+
+Limits:
+
+- Not measured on the real MISA server; DEPLOY-SERVER.md gives sizing derived
+  from these measurements and asks DevOps to re-measure.
+- No load test with 4–5 simultaneous users.
+- Queue positions and the preview copy are covered by tests, but were not
+  checked in the browser.
+- Not a stable release until the user accepts it.

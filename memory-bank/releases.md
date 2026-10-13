@@ -64,6 +64,17 @@ clip-scoped portrait suggestion job using FFmpeg-decoded stills, avoiding the
 host OpenCV AV1 seek limitation. No SQLite migration; await user review before
 stable promotion.
 
+## v0.13.0-rc.1 — internal server edition (candidate)
+
+Shared Talkcut for about 20 MISA staff (4–5 at once) on a CPU-only server:
+administrator-issued accounts, job lanes so long STT never blocks renders,
+resumable 8 MB-piece uploads, 1080p preview copies for 4K/AV1/HEVC, background
+framing of the top suggestions, chunked parallel STT for multi-hour talks,
+`compose.server.yaml` and DEPLOY-SERVER.md for DevOps. Includes the
+v0.12.0-rc.1 director unchanged. The personal install behaves as before
+(accounts off). Rollback target remains the accepted stable `v0.11.0`. Not
+stable until the user accepts it. Evidence: VALIDATION.md "v0.13.0-rc.1".
+
 ## v0.12.0-rc.1 — local AI director (candidate)
 
 Fully automatic 9:16 framing: exact cuts, people clustering, voice-to-person

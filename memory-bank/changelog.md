@@ -216,3 +216,37 @@ Full MP4 validation is recorded in ../VALIDATION.md. Exported source videos and 
   the stacked cut, unchanged under the opening title; preview matches.
 - 192 Python tests (23 new director tests incl. real FFmpeg A/V sync, blend
   and caption placement) and 11 JS tests pass in the rebuilt image.
+
+## 2026-10-13 — v0.13.0-rc.1 candidate: internal server edition
+
+User intent: about 20 MISA staff, usually 4–5 at once, on a MISA server with
+CPU only (no GPU), deployed by DevOps, accounts issued by an administrator.
+Office PCs (i3/i5 gen 10, 8–16 GB) were as slow with the local Docker install
+as manual CapCut work; they should only need a browser. Volume: 1–2 4K
+30-minute videos per week plus occasional multi-hour FHD talkshows.
+
+- Accounts: scrypt hashes, 14-day sessions (SHA-256 of the token stored,
+  HttpOnly SameSite=Lax cookie, Secure behind HTTPS), forced change of
+  issued/reset passwords, admin/editor roles, owner-or-admin deletes,
+  same-origin write guard, login throttle per name+address and per name.
+  `python -m backend.auth create-admin|reset-password|list` for recovery.
+- Job lanes render / framing / ingest / ai with per-lane workers and
+  interactive-before-background priority; job cards show queue position and
+  creator.
+- Uploads in 8 MB pieces with resume after a closed dialog or dropped link.
+- Preview copy (1080p H.264, keyframe every second) for 4K/AV1/HEVC/non-MP4
+  sources; orientation kept, so vertical phone videos stay full size.
+- Long talks: 5-minute STT chunks in parallel; silent chunks skipped; an
+  empty audible chunk is retried, then reported as a gap instead of failing
+  the whole analysis. Gemini windows in parallel. The 3.9 h livestream now
+  analyses fully (about 4 min STT, 21 clips).
+- `RENDER_PRESET` (server: veryfast, 2–2.7× faster encode at SSIM 0.99).
+- UI: sign-in, forced password, account menu, account administration,
+  owner tags, server labels.
+- DevOps package: `compose.server.yaml`, DEPLOY-SERVER.md (sizing, nginx,
+  accounts, tuning, backup, upgrade), `.env.example`.
+- Incident: an early test file let the suite write into the live `/data`.
+  Repaired from backups the same hour (see VALIDATION.md); job history from
+  10-01 to 10-13 was lost. `tests/conftest.py` now forces a temporary
+  `DATA_DIR`.
+

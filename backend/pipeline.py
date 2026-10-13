@@ -128,7 +128,9 @@ def needs_proxy(info, path):
     """Office browsers decode 1080p H.264 in hardware; 4K, AV1 or HEVC sources stutter there."""
     if config.PREVIEW_PROXY != 'auto':
         return False
-    return info.get('height', 0) > PROXY_HEIGHT or info.get('width', 0) > 1920 or info.get('codec') != 'h264' or path.suffix.lower() not in ('.mp4', '.m4v')
+    # Measured on the long/short side so a vertical 1080x1920 phone video is not "4K".
+    sides = sorted((info.get('width', 0), info.get('height', 0)))
+    return sides[0] > PROXY_HEIGHT or sides[1] > 1920 or info.get('codec') != 'h264' or path.suffix.lower() not in ('.mp4', '.m4v')
 
 
 def make_proxy(source, progress):
@@ -138,8 +140,9 @@ def make_proxy(source, progress):
     folder = config.DATA / 'sources' / source['id']
     target, temp = folder / 'preview-1080.mp4', folder / 'preview-1080.part.mp4'
     progress('Đang tạo bản xem trước nhẹ cho trình duyệt', 2)
+    box = (1920, PROXY_HEIGHT) if source.get('width', 0) >= source.get('height', 0) else (PROXY_HEIGHT, 1920)
     ffmpeg_progress(['-i', config.DATA / source['path'], '-map', '0:v:0', '-map', '0:a:0?',
-                     '-vf', f'scale=1920:{PROXY_HEIGHT}:force_original_aspect_ratio=decrease:force_divisible_by=2',
+                     '-vf', f'scale={box[0]}:{box[1]}:force_original_aspect_ratio=decrease:force_divisible_by=2',
                      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-force_key_frames', 'expr:gte(t,n_forced)',
                      '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', temp],
                     source['duration'], lambda frac: progress('Đang tạo bản xem trước nhẹ cho trình duyệt', 2 + int(frac * 96)))

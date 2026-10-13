@@ -26,10 +26,16 @@ services:
       STT_PARALLEL: ${STT_PARALLEL:-4}
       PREVIEW_PROXY: ${PREVIEW_PROXY:-auto}
       PREPARE_FRAMING_TOP: ${PREPARE_FRAMING_TOP:-6}
+    # DATA_PATH: a folder on the large disk (owned by uid 10001) instead of
+    # the Docker volume; both services must see the same /data.
+    volumes:
+      - ${DATA_PATH:-studio-data}:/data
     shm_size: 1gb
     mem_limit: ${STUDIO_MEMORY:-20g}
   face-engine:
     environment:
       FACE_ENGINE_ACCEL: cpu
       FACE_ENGINE_WORKERS: ${FACE_ENGINE_WORKERS:-3}
+    volumes:
+      - ${DATA_PATH:-studio-data}:/data
     mem_limit: ${FACE_ENGINE_MEMORY:-6g}

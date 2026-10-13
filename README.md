@@ -16,6 +16,8 @@ Nếu `.env` đã tồn tại, giữ nguyên file và chạy `./scripts/start.sh
 
 **Trên Windows:** có bộ cài một file `TalkCutStudio-Setup.exe` — nhấp đúp để cài, tạo lối tắt trên Desktop/Start Menu, chạy bằng một cú nhấp. Hoặc nhấp đúp `start.bat` trong thư mục dựng sẵn (tự bật Docker, tạo `.env`, nhận diện GPU, mở trình duyệt). Xem chi tiết + cách tạo bộ cài tại [INSTALL.md](INSTALL.md).
 
+**Máy chủ dùng chung cho nhóm (có tài khoản đăng nhập, chỉ cần CPU):** xem [DEPLOY-SERVER.md](DEPLOY-SERVER.md).
+
 Các model mặc định:
 
 | Công việc | Model / công cụ |

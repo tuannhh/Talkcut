@@ -655,3 +655,40 @@ review in the running editor. Legacy auto-mode code (subject_tracking,
 stacked_view detect/assemble + endpoints, focus Gemini analysis,
 face_tracking, TrackingSubjects.jsx) is unused by auto mode and is scheduled
 for removal in a follow-up commit.
+
+## v0.13.0-rc.1 — internal server edition (2026-10-13)
+
+Accepted user intent (2026-10-13): Talkcut becomes an internal service for
+about 20 MISA staff, usually 4–5 at once, deployed by DevOps on a MISA server
+with CPU and RAM limited and disk plentiful, no GPU. Administrators issue
+accounts. Typical load: 1–2 4K videos of about 30 min a week, plus
+occasional long FHD talkshows/livestreams (3.9 h seen). People pick cuts or
+faces; AI finishes on the server. OpusClip was analysed from public sources
+as the reference; no MISA video was uploaded there.
+
+State:
+
+- Server edition implemented and verified on an isolated test stack (see
+  VALIDATION.md); the live local studio still runs with accounts off.
+- DevOps package: `compose.server.yaml`, DEPLOY-SERVER.md, `.env.example`.
+- Not measured on the real MISA server and not load-tested with 4–5 users;
+  DEPLOY-SERVER.md §8 asks DevOps to measure.
+
+Caveats:
+
+- Inside the `studio` container `DATA_DIR=/data` is live. Tests rely on
+  `tests/conftest.py` forcing a temp folder; compare live record counts
+  around runs.
+- The 2026-10-13 incident lost job history 10-01→10-13 only. Backups:
+  `/data/checkpoints/pre-repair-20261013-153947.sqlite` (state before the
+  repair) and `post-repair-20261013-154121.sqlite`.
+
+Next:
+
+- The user reviews v0.12/v0.13 behaviour.
+- DevOps deploys and measures.
+- Possible follow-ups:
+  - remove legacy auto-mode code (listed in the v0.12 section);
+  - retention/cleanup for old sources on the server;
+  - a source delete for owners and admins.
+
